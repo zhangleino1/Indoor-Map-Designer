@@ -110,23 +110,34 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Create POI
-  function createPOI(floor: number, position: Point, poiType: string = 'custom', name?: string): string {
+  function createPOI(floor: number, position: Point, poiType: string = 'custom', name?: string, accessNodeId?: string): string {
     return addElement({
       type: 'poi',
       floor,
       position: { ...position },
       poiType,
-      name
+      name,
+      accessNodeId
     } as unknown as Omit<POIElement, 'id' | 'visible' | 'locked' | 'style'>)
   }
 
   // Create navigation path
-  function createNavPath(floor: number, points: Point[], bidirectional: boolean = true): string {
+  function createNavPath(
+    floor: number,
+    points: Point[],
+    bidirectional: boolean = true,
+    startNodeId?: string,
+    endNodeId?: string,
+    distance?: number
+  ): string {
     return addElement({
       type: 'navpath',
       floor,
       points: [...points],
-      bidirectional
+      bidirectional,
+      startNodeId,
+      endNodeId,
+      distance
     } as Omit<NavPathElement, 'id' | 'visible' | 'locked' | 'style'>)
   }
 

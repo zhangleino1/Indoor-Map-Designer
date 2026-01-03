@@ -27,6 +27,8 @@ export const useEditorStore = defineStore('editor', () => {
   const layerVisibility = ref<Record<string, boolean>>({
     wall: true,
     room: true,
+    door: true,
+    window: true,
     poi: true,
     navpath: true,
     navnode: true

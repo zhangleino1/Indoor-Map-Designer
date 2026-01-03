@@ -102,6 +102,7 @@ export interface POIElement extends BaseElement {
   icon?: string
   description?: string
   connectsTo?: number[] // Connected floors for elevator/stairs
+  accessNodeId?: string // Nearest navigation node for routing
 }
 
 // Navigation path element
@@ -109,6 +110,9 @@ export interface NavPathElement extends BaseElement {
   type: 'navpath'
   points: Point[]
   bidirectional: boolean
+  startNodeId?: string  // Connected node at start point
+  endNodeId?: string    // Connected node at end point
+  distance?: number     // Path length in meters
 }
 
 // Navigation node element

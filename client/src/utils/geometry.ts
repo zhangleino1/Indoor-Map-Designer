@@ -50,7 +50,7 @@ export function pointInPolygon(point: Point, polygon: Point[]): boolean {
     const yj = polygon[j].y
 
     if (((yi > point.y) !== (yj > point.y)) &&
-        (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+      (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
       inside = !inside
     }
   }
@@ -82,9 +82,9 @@ export function getBounds(points: Point[]): Bounds {
 // Check if point is inside bounds
 export function pointInBounds(point: Point, bounds: Bounds, padding: number = 0): boolean {
   return point.x >= bounds.minX - padding &&
-         point.x <= bounds.maxX + padding &&
-         point.y >= bounds.minY - padding &&
-         point.y <= bounds.maxY + padding
+    point.x <= bounds.maxX + padding &&
+    point.y >= bounds.minY - padding &&
+    point.y <= bounds.maxY + padding
 }
 
 // Get center of bounds
@@ -229,6 +229,13 @@ export function elementContainsPoint(element: MapElement, point: Point, toleranc
       }
     }
   } else if ('position' in element && element.position) {
+    // For door/window with width, use width as the hit area
+    if ('width' in element && element.width) {
+      const halfWidth = element.width / 2
+      // Use a larger hit area for doors/windows
+      const hitTolerance = Math.max(halfWidth, tolerance)
+      return distance(point, element.position) <= hitTolerance
+    }
     return distance(point, element.position) <= tolerance
   }
   return false

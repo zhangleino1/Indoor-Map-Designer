@@ -617,6 +617,7 @@ function drawDoor(c: CanvasRenderingContext2D, element: any) {
   const width = element.width || 90
   const rotation = element.rotation || 0
   const fillColor = element.style.fillColor || '#DEB887'
+  const openDirection = element.openDirection || 'right'
 
   c.save()
   c.translate(pos.x, pos.y)
@@ -630,29 +631,81 @@ function drawDoor(c: CanvasRenderingContext2D, element: any) {
   c.lineTo(width / 2, 0)
   c.stroke()
 
-  // Draw door panel (arc showing swing)
   c.strokeStyle = element.style.strokeColor || '#8B4513'
   c.lineWidth = 2
   c.setLineDash([4, 4])
-  c.beginPath()
-  c.arc(-width / 2, 0, width, 0, -Math.PI / 2, true)
-  c.stroke()
-  c.setLineDash([])
 
-  // Draw door leaf
-  c.fillStyle = fillColor
-  c.strokeStyle = element.style.strokeColor || '#8B4513'
-  c.lineWidth = 2
-  c.beginPath()
-  c.moveTo(-width / 2, 0)
-  c.lineTo(-width / 2, -width * 0.7)
-  c.stroke()
-
-  // Draw door handle
-  c.beginPath()
-  c.arc(-width / 2 + 8, -width * 0.35, 3, 0, Math.PI * 2)
-  c.fillStyle = '#333'
-  c.fill()
+  if (openDirection === 'right') {
+    // Door opens to the right (arc from left hinge)
+    c.beginPath()
+    c.arc(-width / 2, 0, width, 0, -Math.PI / 2, true)
+    c.stroke()
+    c.setLineDash([])
+    
+    // Draw door leaf
+    c.fillStyle = fillColor
+    c.lineWidth = 2
+    c.beginPath()
+    c.moveTo(-width / 2, 0)
+    c.lineTo(-width / 2, -width * 0.7)
+    c.stroke()
+    
+    // Draw door handle
+    c.beginPath()
+    c.arc(-width / 2 + 8, -width * 0.35, 3, 0, Math.PI * 2)
+    c.fillStyle = '#333'
+    c.fill()
+  } else if (openDirection === 'left') {
+    // Door opens to the left (arc from right hinge)
+    c.beginPath()
+    c.arc(width / 2, 0, width, Math.PI, Math.PI + Math.PI / 2, false)
+    c.stroke()
+    c.setLineDash([])
+    
+    // Draw door leaf
+    c.fillStyle = fillColor
+    c.lineWidth = 2
+    c.beginPath()
+    c.moveTo(width / 2, 0)
+    c.lineTo(width / 2, -width * 0.7)
+    c.stroke()
+    
+    // Draw door handle
+    c.beginPath()
+    c.arc(width / 2 - 8, -width * 0.35, 3, 0, Math.PI * 2)
+    c.fillStyle = '#333'
+    c.fill()
+  } else {
+    // Both directions (double door)
+    c.beginPath()
+    c.arc(-width / 2, 0, width / 2, 0, -Math.PI / 2, true)
+    c.stroke()
+    c.beginPath()
+    c.arc(width / 2, 0, width / 2, Math.PI, Math.PI + Math.PI / 2, false)
+    c.stroke()
+    c.setLineDash([])
+    
+    // Draw both door leaves
+    c.fillStyle = fillColor
+    c.lineWidth = 2
+    c.beginPath()
+    c.moveTo(-width / 2, 0)
+    c.lineTo(-width / 2, -width * 0.35)
+    c.stroke()
+    c.beginPath()
+    c.moveTo(width / 2, 0)
+    c.lineTo(width / 2, -width * 0.35)
+    c.stroke()
+    
+    // Draw door handles
+    c.beginPath()
+    c.arc(-width / 2 + 5, -width * 0.17, 2, 0, Math.PI * 2)
+    c.fillStyle = '#333'
+    c.fill()
+    c.beginPath()
+    c.arc(width / 2 - 5, -width * 0.17, 2, 0, Math.PI * 2)
+    c.fill()
+  }
 
   c.restore()
 }
@@ -963,7 +1016,9 @@ function handleMouseDown(e: MouseEvent) {
     // 单击创建的工具类型（POI、导航节点、门、窗户）
     if (tool === 'poi' || tool === 'navnode' || tool === 'door' || tool === 'window') {
       if (tool === 'poi') {
-        elementsStore.createPOI(currentFloor.value, snappedPos, currentPoiType.value)
+        // Find nearest navigation node for POI association
+        const accessNodeId = findNearestNodeForPOI(snappedPos)
+        elementsStore.createPOI(currentFloor.value, snappedPos, currentPoiType.value, undefined, accessNodeId)
       } else if (tool === 'navnode') {
         elementsStore.createNavNode(currentFloor.value, snappedPos)
       } else if (tool === 'door') {
@@ -1209,9 +1264,13 @@ function finishDrawing() {
         elementsStore.createRoom(floor, [...points, points[0]])
       }
       break
-    case 'navpath':
-      elementsStore.createNavPath(floor, points)
+    case 'navpath': {
+      // Snap endpoints to nearby navigation nodes
+      const { snappedPoints, startNodeId, endNodeId } = snapPathToNodes(points)
+      const distance = calculatePathDistance(snappedPoints)
+      elementsStore.createNavPath(floor, snappedPoints, true, startNodeId, endNodeId, distance)
       break
+    }
     case 'navnode':
       if (points.length >= 1) {
         elementsStore.createNavNode(floor, points[0])
@@ -1252,6 +1311,81 @@ function getSnappedPosition(point: Point): Point {
   // Update snap type for visual feedback
   currentSnapType.value = result.snapped ? result.type as any : 'none'
   return result.point
+}
+
+// Navigation node snapping constants
+const NAV_NODE_SNAP_DISTANCE = 20  // pixels for path endpoint snapping
+const POI_NODE_ASSOCIATION_DISTANCE = 100  // pixels for POI association
+
+// Find the nearest navigation node within a given distance
+function findNearestNavNode(point: Point, maxDistance: number = NAV_NODE_SNAP_DISTANCE): { node: any, distance: number } | null {
+  const navNodes = currentElements.value.filter(el => el.type === 'navnode')
+  
+  let nearest: { node: any, distance: number } | null = null
+  
+  for (const node of navNodes) {
+    const nodePos = (node as any).position
+    const dist = Math.sqrt(
+      Math.pow(point.x - nodePos.x, 2) + 
+      Math.pow(point.y - nodePos.y, 2)
+    )
+    
+    if (dist <= maxDistance && (!nearest || dist < nearest.distance)) {
+      nearest = { node, distance: dist }
+    }
+  }
+  
+  return nearest
+}
+
+// Snap a path endpoint to the nearest navigation node
+function snapPathToNodes(points: Point[]): { 
+  snappedPoints: Point[], 
+  startNodeId?: string, 
+  endNodeId?: string 
+} {
+  if (points.length < 2) {
+    return { snappedPoints: points }
+  }
+  
+  const snappedPoints = [...points]
+  let startNodeId: string | undefined
+  let endNodeId: string | undefined
+  
+  // Check start point
+  const startResult = findNearestNavNode(points[0], NAV_NODE_SNAP_DISTANCE)
+  if (startResult) {
+    snappedPoints[0] = { ...startResult.node.position }
+    startNodeId = startResult.node.id
+  }
+  
+  // Check end point
+  const endResult = findNearestNavNode(points[points.length - 1], NAV_NODE_SNAP_DISTANCE)
+  if (endResult) {
+    snappedPoints[snappedPoints.length - 1] = { ...endResult.node.position }
+    endNodeId = endResult.node.id
+  }
+  
+  return { snappedPoints, startNodeId, endNodeId }
+}
+
+// Find nearest node for POI association
+function findNearestNodeForPOI(point: Point): string | undefined {
+  const result = findNearestNavNode(point, POI_NODE_ASSOCIATION_DISTANCE)
+  return result?.node?.id
+}
+
+// Calculate path distance in meters
+function calculatePathDistance(points: Point[]): number {
+  let totalDist = 0
+  for (let i = 0; i < points.length - 1; i++) {
+    totalDist += Math.sqrt(
+      Math.pow(points[i + 1].x - points[i].x, 2) +
+      Math.pow(points[i + 1].y - points[i].y, 2)
+    )
+  }
+  // Convert to meters (assuming 1 pixel = 1 cm, so /100 for meters)
+  return totalDist / 100
 }
 </script>
 

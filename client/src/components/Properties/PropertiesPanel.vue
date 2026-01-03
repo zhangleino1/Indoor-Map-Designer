@@ -85,14 +85,37 @@
           />
         </div>
         <div class="property-row">
-          <span class="property-label">旋转</span>
-          <el-slider
+          <span class="property-label">旋转角度</span>
+          <el-input-number
             v-model="elementRotation"
-            :min="0"
-            :max="360"
             size="small"
+            :min="0"
+            :max="359"
+            :step="1"
             @change="updateRotation"
           />
+        </div>
+        <div class="property-row">
+          <span class="property-label">快速旋转</span>
+          <div class="rotation-presets">
+            <el-button size="small" @click="setRotation(0)" :type="elementRotation === 0 ? 'primary' : 'default'">0°</el-button>
+            <el-button size="small" @click="setRotation(90)" :type="elementRotation === 90 ? 'primary' : 'default'">90°</el-button>
+            <el-button size="small" @click="setRotation(180)" :type="elementRotation === 180 ? 'primary' : 'default'">180°</el-button>
+            <el-button size="small" @click="setRotation(270)" :type="elementRotation === 270 ? 'primary' : 'default'">270°</el-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Door specific: open direction -->
+      <div class="property-group" v-if="selectedElement.type === 'door'">
+        <div class="group-title">门属性</div>
+        <div class="property-row">
+          <span class="property-label">开门方向</span>
+          <el-select v-model="doorOpenDirection" size="small" @change="updateDoorDirection">
+            <el-option label="向右开" value="right" />
+            <el-option label="向左开" value="left" />
+            <el-option label="双向门" value="both" />
+          </el-select>
         </div>
       </div>
 
@@ -119,6 +142,13 @@
             @change="updateConnectsTo"
           />
         </div>
+        
+        <div class="property-row">
+          <span class="property-label">关联节点</span>
+          <span class="property-value" :class="{ 'has-node': poiAccessNode }">
+            {{ poiAccessNode || '无 (超出100px范围)' }}
+          </span>
+        </div>
       </div>
 
       <!-- Room properties -->
@@ -127,6 +157,27 @@
         <div class="property-row">
           <span class="property-label">面积</span>
           <span class="property-value">{{ roomArea }}</span>
+        </div>
+      </div>
+
+      <!-- NavPath properties -->
+      <div class="property-group" v-if="selectedElement.type === 'navpath' && navPathInfo">
+        <div class="group-title">路径连接</div>
+        <div class="property-row">
+          <span class="property-label">起点节点</span>
+          <span class="property-value" :class="{ 'has-node': navPathInfo.startNodeId !== '未连接' }">
+            {{ navPathInfo.startNodeId }}
+          </span>
+        </div>
+        <div class="property-row">
+          <span class="property-label">终点节点</span>
+          <span class="property-value" :class="{ 'has-node': navPathInfo.endNodeId !== '未连接' }">
+            {{ navPathInfo.endNodeId }}
+          </span>
+        </div>
+        <div class="property-row">
+          <span class="property-label">路径长度</span>
+          <span class="property-value">{{ navPathInfo.distance }}</span>
         </div>
       </div>
 
@@ -199,6 +250,7 @@ const posY = ref(0)
 const wallThickness = ref(24)
 const elementWidth = ref(90)
 const elementRotation = ref(0)
+const doorOpenDirection = ref('right')
 const poiType = ref('custom')
 const connectsTo = ref('')
 const strokeColor = ref('#333333')
@@ -228,7 +280,28 @@ const roomArea = computed(() => {
   // Convert to square meters based on scale
   const scale = editorStore.scale
   const sqCm = area * scale * scale
-  return `${(sqCm / 10000).toFixed(2)} m虏`
+  return `${(sqCm / 10000).toFixed(2)} m²`
+})
+
+// POI associated navigation node
+const poiAccessNode = computed(() => {
+  if (!selectedElement.value || selectedElement.value.type !== 'poi') return ''
+  const poi = selectedElement.value as POIElement
+  if (poi.accessNodeId) {
+    return poi.accessNodeId.substring(0, 8) + '...'
+  }
+  return ''
+})
+
+// Navigation path info
+const navPathInfo = computed(() => {
+  if (!selectedElement.value || selectedElement.value.type !== 'navpath') return null
+  const path = selectedElement.value as any
+  return {
+    startNodeId: path.startNodeId ? path.startNodeId.substring(0, 8) + '...' : '未连接',
+    endNodeId: path.endNodeId ? path.endNodeId.substring(0, 8) + '...' : '未连接',
+    distance: path.distance ? `${path.distance.toFixed(2)}m` : '未计算'
+  }
 })
 
 // Sync local state when selection changes
@@ -252,6 +325,10 @@ watch(selectedElement, (element) => {
   if (element.type === 'door' || element.type === 'window') {
     elementWidth.value = (element as DoorElement).width
     elementRotation.value = (element as DoorElement).rotation
+  }
+
+  if (element.type === 'door') {
+    doorOpenDirection.value = (element as DoorElement).openDirection || 'right'
   }
 
   if (element.type === 'poi') {
@@ -290,6 +367,18 @@ function updateRotation() {
   if (!selectedElement.value) return
   elementsStore.updateElement(selectedElement.value.id, {
     rotation: elementRotation.value
+  } as any)
+}
+
+function setRotation(angle: number) {
+  elementRotation.value = angle
+  updateRotation()
+}
+
+function updateDoorDirection() {
+  if (!selectedElement.value) return
+  elementsStore.updateElement(selectedElement.value.id, {
+    openDirection: doorOpenDirection.value
   } as any)
 }
 
@@ -411,6 +500,26 @@ function deleteElement() {
 
 :deep(.el-select) {
   width: 100%;
+}
+
+.rotation-presets {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.rotation-presets .el-button {
+  padding: 4px 8px;
+  min-width: 40px;
+}
+
+.has-node {
+  color: #67c23a;
+  font-weight: 500;
+}
+
+.property-value:not(.has-node) {
+  color: #999;
 }
 </style>
 
