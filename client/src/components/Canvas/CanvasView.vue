@@ -1288,13 +1288,15 @@ function handleMouseLeave() {
 function handleDoubleClick() {
   if (!isDrawing.value) return
 
-  finishDrawing()
+  finishCurrentSegment()
 }
 
-function handleContextMenu() {
+function handleContextMenu(e: MouseEvent) {
+  e.preventDefault()
+
   if (isDrawing.value) {
-    editorStore.cancelDrawing()
-    currentDimension.value = ''
+    // 右键：完成当前段并开始新段（不退出工具）
+    finishCurrentSegment()
   }
 }
 
@@ -1338,15 +1340,19 @@ function handleKeyDown(e: KeyboardEvent) {
       break
     case 'escape':
       if (isDrawing.value) {
+        // Escape: 取消当前绘制并退出工具
         editorStore.cancelDrawing()
         currentDimension.value = ''
+        // 退出绘制工具，切换到选择工具
+        editorStore.setTool('select')
       } else {
         editorStore.clearSelection()
       }
       break
     case 'enter':
       if (isDrawing.value) {
-        finishDrawing()
+        // Enter: 完成当前段，工具保持激活（可以继续画新段）
+        finishCurrentSegment()
       }
       break
     case 'delete':
@@ -1399,8 +1405,14 @@ function handleKeyUp(e: KeyboardEvent) {
   }
 }
 
-function finishDrawing() {
-  const points = editorStore.finishDrawing()
+// 完成当前段，但保持工具激活（可以继续画新段）
+function finishCurrentSegment() {
+  const points = [...drawingPoints.value]
+
+  // 清空当前绘制状态（但不退出工具）
+  editorStore.cancelDrawing()
+  currentDimension.value = ''
+
   if (points.length < 2) return
 
   const tool = currentTool.value
@@ -1409,16 +1421,26 @@ function finishDrawing() {
   // Skip if this was a drag tool (already handled in handleMouseUp)
   const dragTools = ['room', 'corridor', 'hall']
   if (dragTools.includes(tool) && points.length === 2) {
-    // This will be handled by handleMouseUp, don't create duplicate
     return
   }
 
+  // 创建元素
   switch (tool) {
     case 'wall':
       elementsStore.createWall(floor, points)
       break
+    case 'navpath': {
+      const { snappedPoints, startNodeId, endNodeId } = snapPathToNodes(points)
+      const distance = calculatePathDistance(snappedPoints)
+      elementsStore.createNavPath(floor, snappedPoints, true, startNodeId, endNodeId, distance)
+      break
+    }
+    case 'polygon':
+      if (points.length >= 3) {
+        elementsStore.createRoom(floor, [...points, points[0]])
+      }
+      break
     case 'room':
-      // Only create from finishDrawing if using polygon mode (3+ points)
       if (points.length >= 3) {
         elementsStore.createRoom(floor, [...points, points[0]])
       }
@@ -1433,36 +1455,9 @@ function finishDrawing() {
         elementsStore.createHall(floor, [...points, points[0]])
       }
       break
-    case 'polygon':
-      if (points.length >= 3) {
-        elementsStore.createRoom(floor, [...points, points[0]])
-      }
-      break
-    case 'navpath': {
-      // Snap endpoints to nearby navigation nodes
-      const { snappedPoints, startNodeId, endNodeId } = snapPathToNodes(points)
-      const distance = calculatePathDistance(snappedPoints)
-      elementsStore.createNavPath(floor, snappedPoints, true, startNodeId, endNodeId, distance)
-      break
-    }
-    case 'navnode':
-      if (points.length >= 1) {
-        elementsStore.createNavNode(floor, points[0])
-      }
-      break
-    case 'poi':
-      if (points.length >= 1) {
-        elementsStore.createPOI(floor, points[0])
-      }
-      break
-    case 'poster':
-      if (points.length >= 1) {
-        elementsStore.createPoster(floor, points[0])
-      }
-      break
   }
 
-  currentDimension.value = ''
+  // 工具保持激活，用户可以继续画下一段
 }
 
 function findElementAtPoint(point: Point): MapElement | undefined {
