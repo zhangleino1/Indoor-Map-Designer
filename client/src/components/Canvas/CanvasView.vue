@@ -1370,10 +1370,21 @@ function handleKeyDown(e: KeyboardEvent) {
       break
     case 'z':
       if (e.ctrlKey || e.metaKey) {
-        if (e.shiftKey) {
-          elementsStore.redo()
+        // 如果正在绘制，Ctrl+Z 删除最后一个点（而不是全局撤销）
+        if (isDrawing.value) {
+          e.preventDefault() // 防止浏览器默认行为
+          if (!editorStore.removeLastDrawingPoint()) {
+            // 如果只剩一个点，取消绘制
+            editorStore.cancelDrawing()
+            currentDimension.value = ''
+          }
         } else {
-          elementsStore.undo()
+          // 没有在绘制时，执行全局撤销/重做
+          if (e.shiftKey) {
+            elementsStore.redo()
+          } else {
+            elementsStore.undo()
+          }
         }
       }
       break
