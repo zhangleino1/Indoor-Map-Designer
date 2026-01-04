@@ -136,7 +136,7 @@ export const useElementsStore = defineStore('elements', () => {
     endNodeId?: string,
     distance?: number
   ): string {
-    return addElement({
+    const pathId = addElement({
       type: 'navpath',
       floor,
       points: [...points],
@@ -145,6 +145,31 @@ export const useElementsStore = defineStore('elements', () => {
       endNodeId,
       distance
     } as Omit<NavPathElement, 'id' | 'visible' | 'locked' | 'style'>)
+
+    // Auto-associate with connected nodes
+    if (startNodeId) {
+      const startNode = getElementById(startNodeId) as NavNodeElement | undefined
+      if (startNode && startNode.type === 'navnode') {
+        if (!startNode.connectedPaths.includes(pathId)) {
+          updateElement(startNodeId, {
+            connectedPaths: [...startNode.connectedPaths, pathId]
+          })
+        }
+      }
+    }
+
+    if (endNodeId && endNodeId !== startNodeId) {
+      const endNode = getElementById(endNodeId) as NavNodeElement | undefined
+      if (endNode && endNode.type === 'navnode') {
+        if (!endNode.connectedPaths.includes(pathId)) {
+          updateElement(endNodeId, {
+            connectedPaths: [...endNode.connectedPaths, pathId]
+          })
+        }
+      }
+    }
+
+    return pathId
   }
 
   // Create navigation node
@@ -241,6 +266,38 @@ export const useElementsStore = defineStore('elements', () => {
       const elements = elementsByFloor.value[floor]
       const index = elements.findIndex(el => el.id === id)
       if (index !== -1) {
+        const element = elements[index]
+
+        // Clean up associations before deleting
+        if (element.type === 'navpath') {
+          // Remove this path from connected nodes
+          const navPath = element as NavPathElement
+          if (navPath.startNodeId) {
+            cleanupNavNodePath(navPath.startNodeId, id)
+          }
+          if (navPath.endNodeId && navPath.endNodeId !== navPath.startNodeId) {
+            cleanupNavNodePath(navPath.endNodeId, id)
+          }
+        } else if (element.type === 'navnode') {
+          // Remove node reference from connected paths
+          const navNode = element as NavNodeElement
+          navNode.connectedPaths.forEach(pathId => {
+            const path = getElementById(pathId) as NavPathElement | undefined
+            if (path && path.type === 'navpath') {
+              const updates: Partial<NavPathElement> = {}
+              if (path.startNodeId === id) {
+                updates.startNodeId = undefined
+              }
+              if (path.endNodeId === id) {
+                updates.endNodeId = undefined
+              }
+              if (Object.keys(updates).length > 0) {
+                updateElement(pathId, updates)
+              }
+            }
+          })
+        }
+
         const deleted = elements.splice(index, 1)
         pushHistory({
           type: 'delete',
@@ -249,6 +306,69 @@ export const useElementsStore = defineStore('elements', () => {
         return
       }
     }
+  }
+
+  // Helper: Remove path from node's connectedPaths
+  function cleanupNavNodePath(nodeId: string, pathId: string) {
+    const node = getElementById(nodeId) as NavNodeElement | undefined
+    if (node && node.type === 'navnode') {
+      const newConnectedPaths = node.connectedPaths.filter(id => id !== pathId)
+      if (newConnectedPaths.length !== node.connectedPaths.length) {
+        updateElement(nodeId, {
+          connectedPaths: newConnectedPaths
+        })
+      }
+    }
+  }
+
+  // Helper: Validate NavNode ID format (Python format: a1, b2, c3, etc.)
+  function validateNavNodeId(id: string): { valid: boolean; corridor?: string; index?: number; error?: string } {
+    const match = id.match(/^([a-z]+)(\d+)$/i)
+    if (!match) {
+      return {
+        valid: false,
+        error: 'ID must be in format: letter(s) + number (e.g., a1, b2, corridor3)'
+      }
+    }
+    return {
+      valid: true,
+      corridor: match[1].toLowerCase(),
+      index: parseInt(match[2])
+    }
+  }
+
+  // Helper: Get NavNodes in same corridor
+  function getCorridorNavNodes(corridorId: string, floor?: number): NavNodeElement[] {
+    const nodes: NavNodeElement[] = []
+    const floorsToCheck = floor !== undefined ? [floor] : Object.keys(elementsByFloor.value)
+
+    floorsToCheck.forEach(f => {
+      const elements = elementsByFloor.value[f] || []
+      elements.forEach(el => {
+        if (el.type === 'navnode') {
+          const validation = validateNavNodeId(el.id)
+          if (validation.valid && validation.corridor === corridorId.toLowerCase()) {
+            nodes.push(el as NavNodeElement)
+          }
+        }
+      })
+    })
+
+    // Sort by index
+    return nodes.sort((a, b) => {
+      const aVal = validateNavNodeId(a.id)
+      const bVal = validateNavNodeId(b.id)
+      return (aVal.index || 0) - (bVal.index || 0)
+    })
+  }
+
+  // Helper: Auto-assign NavNode index based on corridor
+  function generateNavNodeId(floor: number, corridorId: string = 'a'): string {
+    const existingNodes = getCorridorNavNodes(corridorId, floor)
+    const maxIndex = existingNodes.length > 0
+      ? Math.max(...existingNodes.map(n => validateNavNodeId(n.id).index || 0))
+      : 0
+    return `${corridorId}${maxIndex + 1}`
   }
 
   // Delete multiple elements
@@ -533,7 +653,11 @@ export const useElementsStore = defineStore('elements', () => {
     saveToStorage,
     loadFromStorage,
     hasSavedData,
-    clearSavedData
+    clearSavedData,
+    // Navigation helpers
+    validateNavNodeId,
+    getCorridorNavNodes,
+    generateNavNodeId
   }
 })
 
