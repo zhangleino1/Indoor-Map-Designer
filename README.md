@@ -56,30 +56,99 @@ npm run build
 
 ### Keyboard Shortcuts
 
+#### Tool Selection
+
+| Key | Tool |
+|-----|------|
+| `V` | Select tool |
+| `W` | Wall/Line tool |
+| `Shift+W` | Window tool |
+| `D` | Door tool |
+| `R` | Room/Rectangle tool |
+| `P` | Polygon tool |
+| `M` | POI marker tool |
+| `O` | Navigation node tool |
+| `N` | Navigation path tool |
+
+#### Drawing Mode (When Using Multi-point Tools)
+
+**Multi-point tools**: Wall, NavPath, Polygon
+
+| Key/Action | Effect |
+|------------|--------|
+| **Left Click** | Add point to current segment |
+| **Double Click** | Finish current segment, stay in tool (can draw next segment) |
+| **Right Click** | Finish current segment, stay in tool |
+| **Enter** | Finish current segment, stay in tool |
+| **Ctrl+Z** | Remove last point from current drawing |
+| **Backspace** | Remove last point from current drawing |
+| **Escape** | Cancel drawing and exit tool (switch to Select) |
+
+**💡 Tip**: You can now draw multiple disconnected segments without exiting the tool!
+- Example: Draw T-shaped wall → horizontal segment (double-click) → vertical segment (double-click) → Escape
+
+#### Global Shortcuts
+
 | Key | Action |
 |-----|--------|
-| V | Select tool |
-| W | Wall/Line tool |
-| R | Room/Rectangle tool |
-| P | Polygon tool |
-| D | Door tool |
-| Shift+W | Window tool |
-| M | POI marker tool |
-| N | Navigation path tool |
-| Delete | Delete selected elements |
-| Ctrl+Z | Undo |
-| Ctrl+Shift+Z | Redo |
-| Escape | Cancel drawing / Clear selection |
-| Enter | Finish drawing |
+| **Ctrl+Z** | Undo (or remove last point when drawing) |
+| **Ctrl+Shift+Z** | Redo |
+| **Delete** | Delete selected elements |
+| **Backspace** | Delete selected elements (or remove last point when drawing) |
+| **Escape** | Cancel drawing / Clear selection / Exit tool |
+| **Space** | Hold to enable pan mode (drag with mouse) |
 
 ### Mouse Controls
 
-- **Left Click**: Draw/Select
-- **Right Click**: Cancel drawing
-- **Double Click**: Finish polygon/path drawing
-- **Ctrl + Scroll**: Zoom in/out
-- **Scroll**: Pan canvas
-- **Middle Button Drag**: Pan canvas
+| Action | Effect |
+|--------|--------|
+| **Left Click** | Draw point / Select element |
+| **Left Drag** | Draw rectangle (Room/Corridor/Hall) / Move selected element |
+| **Double Click** | Finish current segment (multi-point tools) |
+| **Right Click** | Finish current segment (when drawing) |
+| **Ctrl + Scroll** | Zoom in/out |
+| **Scroll** | Pan canvas vertically |
+| **Shift + Scroll** | Pan canvas horizontally |
+| **Middle Button Drag** | Pan canvas |
+| **Space + Left Drag** | Pan canvas |
+
+### Drawing Workflow Examples
+
+#### Example 1: T-Shaped Wall
+```
+1. Press W (wall tool)
+2. Click point 1 → point 2 → double-click (horizontal wall complete)
+3. Click point 3 → point 4 → double-click (vertical wall complete, no connection!)
+4. Press Escape (exit tool)
+```
+
+#### Example 2: Multiple Rooms
+```
+1. Press R (room tool)
+2. Drag first room → release
+3. Drag second room → release
+4. Drag third room → release
+...
+n. Press Escape when done
+```
+
+#### Example 3: Complex Navigation Path
+```
+1. Press N (navpath tool)
+2. Click points for route A → double-click (route A complete)
+3. Click points for route B → double-click (route B complete)
+4. Click points for route C → double-click (route C complete)
+5. Press Escape (exit tool)
+```
+
+#### Example 4: Fix Wrong Point While Drawing
+```
+1. Drawing wall: point 1 → point 2 → point 3
+2. Oops! Point 3 is wrong
+3. Press Ctrl+Z (point 3 removed)
+4. Click correct point 3 → continue drawing
+5. Double-click to finish
+```
 
 ## GeoJSON Output Format
 
