@@ -166,8 +166,12 @@ function ensureClosedPolygon(coords: number[][]): number[][] {
   return coords
 }
 
-// Convert navigation path to GeoJSON feature
+// Convert navigation path to GeoJSON feature (Explicit edge format for Python)
 function navPathToFeature(navPath: NavPathElement): GeoJSONFeature {
+  // Calculate distance in meters (1px = 1cm, so /100 for meters)
+  const lengthInCm = calculateLineLength(navPath.points)
+  const distanceInMeters = lengthInCm / 100
+
   return {
     type: 'Feature',
     geometry: {
@@ -175,13 +179,19 @@ function navPathToFeature(navPath: NavPathElement): GeoJSONFeature {
       coordinates: pointsToCoords(navPath.points)
     },
     properties: {
+      // Python format: explicit edge with start/end nodes
+      type: 'edge',  // Changed from 'navpath' to 'edge' for Python compatibility
       id: navPath.id,
-      type: 'navpath',
+      start_node: navPath.startNodeId || '',  // Explicit start node ID
+      end_node: navPath.endNodeId || '',      // Explicit end node ID
+      bidirectional: navPath.bidirectional !== false,
+      distance: distanceInMeters,  // Distance in meters
+      weight: navPath.distance || distanceInMeters,  // Allow custom weight
       floor: navPath.floor,
+      // Designer-specific properties (for re-import)
       name: navPath.name,
-      bidirectional: navPath.bidirectional,
-      length: calculateLineLength(navPath.points),
-      style: navPath.style
+      style: navPath.style,
+      _designer_type: 'navpath'  // Preserve original type for import
     }
   }
 }
@@ -319,7 +329,7 @@ function navNodeToFeature(navNode: NavNodeElement): GeoJSONFeature {
 }
 
 // Convert any element to GeoJSON feature
-export function elementToFeature(element: MapElement, options?: { skipNavPath?: boolean }): GeoJSONFeature | null {
+export function elementToFeature(element: MapElement): GeoJSONFeature | null {
   switch (element.type) {
     case 'wall':
       return wallToFeature(element as WallElement)
@@ -334,8 +344,6 @@ export function elementToFeature(element: MapElement, options?: { skipNavPath?: 
     case 'poster':
       return posterToFeature(element as PosterElement)
     case 'navpath':
-      // Skip navpath if option is set (Python format doesn't need explicit paths)
-      if (options?.skipNavPath) return null
       return navPathToFeature(element as NavPathElement)
     case 'navnode':
       return navNodeToFeature(element as NavNodeElement)
@@ -357,7 +365,6 @@ export function exportToGeoJSON(
     unit: string
   },
   options?: {
-    skipNavPath?: boolean        // Skip NavPath elements (Python format)
     coordinateSystem?: 'relative' | 'geographic'  // Coordinate system type
     origin?: string              // Origin description
   }
@@ -367,7 +374,7 @@ export function exportToGeoJSON(
   for (const floor in elementsByFloor) {
     for (const element of elementsByFloor[floor]) {
       if (element.visible) {
-        const feature = elementToFeature(element, { skipNavPath: options?.skipNavPath })
+        const feature = elementToFeature(element)
         if (feature) {
           features.push(feature)
         }
@@ -382,7 +389,9 @@ export function exportToGeoJSON(
       scale: projectInfo.scale,
       unit: projectInfo.unit,
       coordinateSystem: options?.coordinateSystem || 'relative',
-      origin: options?.origin || 'canvas_topleft'
+      origin: options?.origin || 'canvas_topleft',
+      format_version: '2.0',  // Mark as new explicit edge format
+      edge_type: 'explicit'   // Indicate explicit edges (not implicit)
     },
     features
   }
@@ -398,14 +407,13 @@ export function exportFloorToGeoJSON(
     unit: string
   },
   options?: {
-    skipNavPath?: boolean
     coordinateSystem?: 'relative' | 'geographic'
     origin?: string
   }
 ): GeoJSONCollection {
   const features: GeoJSONFeature[] = elements
     .filter(el => el.visible)
-    .map(el => elementToFeature(el, { skipNavPath: options?.skipNavPath }))
+    .map(el => elementToFeature(el))
     .filter((f): f is GeoJSONFeature => f !== null)
 
   return {
@@ -416,6 +424,8 @@ export function exportFloorToGeoJSON(
       unit: projectInfo.unit,
       coordinateSystem: options?.coordinateSystem || 'relative',
       origin: options?.origin || 'canvas_topleft',
+      format_version: '2.0',
+      edge_type: 'explicit',
       floor: floor.id,
       floorName: floor.name
     },
@@ -590,12 +600,17 @@ function featureToElement(feature: GeoJSONFeature): MapElement | null {
         rotation: props.rotation || 0
       } as any
 
+    // Import edge (NavPath) - support both 'edge' and 'navpath' types
+    case 'edge':
     case 'navpath':
       return {
         ...baseProps,
         type: 'navpath',
         points: coordsToPoints(feature.geometry.coordinates as number[][]),
-        bidirectional: props.bidirectional !== false
+        bidirectional: props.bidirectional !== false,
+        startNodeId: props.start_node,
+        endNodeId: props.end_node,
+        distance: props.distance
       } as NavPathElement
 
     // Python format uses "point" for navigation nodes
