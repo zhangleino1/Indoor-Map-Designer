@@ -128,7 +128,7 @@ function switchTool(newTool: ToolType) {
 // 将绘制的点保存为元素
 function saveDrawingAsElement(points: Point[], tool: ToolType, floor: number) {
   if (points.length < 1) return
-  
+
   switch (tool) {
     case 'wall':
       if (points.length >= 2) {
@@ -139,6 +139,18 @@ function saveDrawingAsElement(points: Point[], tool: ToolType, floor: number) {
       if (points.length >= 2) {
         const rect = createRectangle(points[0], points[points.length - 1])
         elementsStore.createRoom(floor, rect)
+      }
+      break
+    case 'corridor':
+      if (points.length >= 2) {
+        const rect = createRectangle(points[0], points[points.length - 1])
+        elementsStore.createCorridor(floor, rect)
+      }
+      break
+    case 'hall':
+      if (points.length >= 2) {
+        const rect = createRectangle(points[0], points[points.length - 1])
+        elementsStore.createHall(floor, rect)
       }
       break
     case 'polygon':
@@ -154,6 +166,10 @@ function saveDrawingAsElement(points: Point[], tool: ToolType, floor: number) {
     case 'poi':
       // POI只需要一个点
       elementsStore.createPOI(floor, points[0], currentPoiType.value)
+      break
+    case 'poster':
+      // 海报只需要一个点
+      elementsStore.createPoster(floor, points[0])
       break
     case 'navnode':
       // 导航节点只需要一个点
@@ -286,8 +302,17 @@ function drawElement(c: CanvasRenderingContext2D, element: MapElement) {
     case 'room':
       drawRoom(c, element)
       break
+    case 'corridor':
+      drawCorridor(c, element)
+      break
+    case 'hall':
+      drawHall(c, element)
+      break
     case 'poi':
       drawPOI(c, element)
+      break
+    case 'poster':
+      drawPoster(c, element)
       break
     case 'navpath':
       drawNavPath(c, element)
@@ -381,6 +406,70 @@ function drawRoom(c: CanvasRenderingContext2D, element: any) {
     c.save()
     c.fillStyle = '#666'
     c.font = '14px Arial'
+    c.textAlign = 'center'
+    c.textBaseline = 'middle'
+    c.fillText(element.name, centerX, centerY)
+    c.restore()
+  }
+}
+
+function drawCorridor(c: CanvasRenderingContext2D, element: any) {
+  if (element.points.length < 3) return
+
+  c.beginPath()
+  c.moveTo(element.points[0].x, element.points[0].y)
+  for (let i = 1; i < element.points.length; i++) {
+    c.lineTo(element.points[i].x, element.points[i].y)
+  }
+  c.closePath()
+
+  if (element.style.fillColor) {
+    c.fillStyle = element.style.fillColor
+    c.fill()
+  }
+  c.stroke()
+
+  // Draw corridor name if exists
+  if (element.name) {
+    const bounds = getBoundsFromPoints(element.points)
+    const centerX = (bounds.minX + bounds.maxX) / 2
+    const centerY = (bounds.minY + bounds.maxY) / 2
+
+    c.save()
+    c.fillStyle = '#999'
+    c.font = '12px Arial'
+    c.textAlign = 'center'
+    c.textBaseline = 'middle'
+    c.fillText(element.name, centerX, centerY)
+    c.restore()
+  }
+}
+
+function drawHall(c: CanvasRenderingContext2D, element: any) {
+  if (element.points.length < 3) return
+
+  c.beginPath()
+  c.moveTo(element.points[0].x, element.points[0].y)
+  for (let i = 1; i < element.points.length; i++) {
+    c.lineTo(element.points[i].x, element.points[i].y)
+  }
+  c.closePath()
+
+  if (element.style.fillColor) {
+    c.fillStyle = element.style.fillColor
+    c.fill()
+  }
+  c.stroke()
+
+  // Draw hall name if exists
+  if (element.name) {
+    const bounds = getBoundsFromPoints(element.points)
+    const centerX = (bounds.minX + bounds.maxX) / 2
+    const centerY = (bounds.minY + bounds.maxY) / 2
+
+    c.save()
+    c.fillStyle = '#888'
+    c.font = '16px Arial'
     c.textAlign = 'center'
     c.textBaseline = 'middle'
     c.fillText(element.name, centerX, centerY)
@@ -569,6 +658,40 @@ function drawPOIIcon(c: CanvasRenderingContext2D, x: number, y: number, type: st
   c.restore()
 }
 
+function drawPoster(c: CanvasRenderingContext2D, element: any) {
+  const pos = element.position
+  const size = 16
+
+  // Draw poster icon (like a bulletin board)
+  c.save()
+
+  // Draw background rectangle
+  c.fillStyle = element.style.fillColor || '#FFC107'
+  c.fillRect(pos.x - size / 2, pos.y - size / 2, size, size)
+
+  // Draw border
+  c.strokeStyle = element.style.strokeColor || '#FF9800'
+  c.lineWidth = 2
+  c.strokeRect(pos.x - size / 2, pos.y - size / 2, size, size)
+
+  // Draw poster icon (P symbol)
+  c.fillStyle = '#fff'
+  c.font = 'bold 12px Arial'
+  c.textAlign = 'center'
+  c.textBaseline = 'middle'
+  c.fillText('P', pos.x, pos.y)
+
+  // Draw poster name if exists
+  if (element.name) {
+    c.fillStyle = '#333'
+    c.font = '11px Arial'
+    c.textAlign = 'center'
+    c.textBaseline = 'top'
+    c.fillText(element.name, pos.x, pos.y + size / 2 + 4)
+  }
+
+  c.restore()
+}
 
 function drawNavPath(c: CanvasRenderingContext2D, element: any) {
   if (element.points.length < 2) return
@@ -1259,6 +1382,18 @@ function finishDrawing() {
         elementsStore.createRoom(floor, rect)
       }
       break
+    case 'corridor':
+      if (points.length >= 2) {
+        const rect = createRectangle(points[0], points[points.length - 1])
+        elementsStore.createCorridor(floor, rect)
+      }
+      break
+    case 'hall':
+      if (points.length >= 2) {
+        const rect = createRectangle(points[0], points[points.length - 1])
+        elementsStore.createHall(floor, rect)
+      }
+      break
     case 'polygon':
       if (points.length >= 3) {
         elementsStore.createRoom(floor, [...points, points[0]])
@@ -1279,6 +1414,11 @@ function finishDrawing() {
     case 'poi':
       if (points.length >= 1) {
         elementsStore.createPOI(floor, points[0])
+      }
+      break
+    case 'poster':
+      if (points.length >= 1) {
+        elementsStore.createPoster(floor, points[0])
       }
       break
   }
