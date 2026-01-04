@@ -4,9 +4,12 @@ import type {
   MapElement,
   WallElement,
   RoomElement,
+  CorridorElement,
+  HallElement,
   DoorElement,
   WindowElement,
   POIElement,
+  PosterElement,
   NavPathElement,
   NavNodeElement,
   Point,
@@ -23,9 +26,12 @@ function generateId(): string {
 const defaultStyles: Record<string, ElementStyle> = {
   wall: { strokeColor: '#333333', strokeWidth: 3, fillColor: undefined, opacity: 1 },
   room: { strokeColor: '#666666', strokeWidth: 2, fillColor: '#E8F4F8', opacity: 0.5 },
+  corridor: { strokeColor: '#999999', strokeWidth: 2, fillColor: '#F5F5F5', opacity: 0.3 },
+  hall: { strokeColor: '#888888', strokeWidth: 2, fillColor: '#FAFAFA', opacity: 0.3 },
   door: { strokeColor: '#8B4513', strokeWidth: 2, fillColor: '#DEB887', opacity: 1 },
   window: { strokeColor: '#4169E1', strokeWidth: 2, fillColor: '#87CEEB', opacity: 0.8 },
   poi: { strokeColor: '#FF6B6B', strokeWidth: 2, fillColor: '#FFE0E0', opacity: 1 },
+  poster: { strokeColor: '#FFC107', strokeWidth: 2, fillColor: '#FFECB3', opacity: 1 },
   navpath: { strokeColor: '#4CAF50', strokeWidth: 2, fillColor: undefined, opacity: 0.7 },
   navnode: { strokeColor: '#2196F3', strokeWidth: 2, fillColor: '#64B5F6', opacity: 1 }
 }
@@ -172,6 +178,42 @@ export const useElementsStore = defineStore('elements', () => {
       width,
       rotation
     } as Omit<WindowElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create corridor
+  function createCorridor(floor: number, points: Point[], name?: string): string {
+    const area = calculatePolygonArea(points)
+    return addElement({
+      type: 'corridor',
+      floor,
+      points: [...points],
+      name,
+      area
+    } as Omit<CorridorElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create hall
+  function createHall(floor: number, points: Point[], name?: string): string {
+    const area = calculatePolygonArea(points)
+    return addElement({
+      type: 'hall',
+      floor,
+      points: [...points],
+      name,
+      area
+    } as Omit<HallElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create poster
+  function createPoster(floor: number, position: Point, name?: string, rotation?: string, vertexId?: string): string {
+    return addElement({
+      type: 'poster',
+      floor,
+      position: { ...position },
+      name,
+      rotation,
+      vertexId
+    } as Omit<PosterElement, 'id' | 'visible' | 'locked' | 'style'>)
   }
 
   // Update element
@@ -468,7 +510,10 @@ export const useElementsStore = defineStore('elements', () => {
     addElement,
     createWall,
     createRoom,
+    createCorridor,
+    createHall,
     createPOI,
+    createPoster,
     createNavPath,
     createNavNode,
     createDoor,

@@ -20,6 +20,9 @@ export type ToolType =
   | 'door'
   | 'window'
   | 'poi'
+  | 'corridor'
+  | 'hall'
+  | 'poster'
   | 'navpath'
   | 'navnode'
 
@@ -27,9 +30,12 @@ export type ToolType =
 export type ElementType =
   | 'wall'
   | 'room'
+  | 'corridor'
+  | 'hall'
   | 'door'
   | 'window'
   | 'poi'
+  | 'poster'
   | 'navpath'
   | 'navnode'
 
@@ -75,6 +81,24 @@ export interface RoomElement extends BaseElement {
   type: 'room'
   points: Point[]
   area?: number
+  // Navigation support for Python GeoJSON format
+  doors?: Point[]              // Door positions on room perimeter
+  doorVertices?: Point[]       // Closest corridor points to each door
+  doorVertexIds?: string[]     // Navigation vertex IDs for each door
+}
+
+// Corridor element (Polygon - walkable area)
+export interface CorridorElement extends BaseElement {
+  type: 'corridor'
+  points: Point[]
+  area?: number
+}
+
+// Hall element (Polygon - large walkable area)
+export interface HallElement extends BaseElement {
+  type: 'hall'
+  points: Point[]
+  area?: number
 }
 
 // Door element
@@ -102,7 +126,20 @@ export interface POIElement extends BaseElement {
   icon?: string
   description?: string
   connectsTo?: number[] // Connected floors for elevator/stairs
-  accessNodeId?: string // Nearest navigation node for routing
+  // Navigation support for Python GeoJSON format
+  gender?: 'men' | 'women' // For toilet POIs
+  doors?: Point[]          // Door positions (POIs are rendered as polygons in Python format)
+  doorVertices?: Point[]   // Closest corridor points
+  doorVertexIds?: string[] // Navigation vertex IDs
+  accessNodeId?: string    // Deprecated: use doorVertexIds instead
+}
+
+// Poster element (Point - information display)
+export interface PosterElement extends BaseElement {
+  type: 'poster'
+  position: Point
+  rotation?: string        // Direction vector like "'-1,0'" or "'0,1'"
+  vertexId?: string        // Associated navigation vertex ID
 }
 
 // Navigation path element
@@ -119,16 +156,23 @@ export interface NavPathElement extends BaseElement {
 export interface NavNodeElement extends BaseElement {
   type: 'navnode'
   position: Point
-  connectedPaths: string[]
+  connectedPaths: string[] // Internal use: connected NavPath elements
+  // Python GeoJSON format support
+  rotation?: string        // Direction vector "0,1" or "1,0" (x,y)
+  index?: number           // Sequential index within floor
+  intersectionWith?: string // ID of connected vertex at intersection (inct)
 }
 
 // Union type for all elements
 export type MapElement =
   | WallElement
   | RoomElement
+  | CorridorElement
+  | HallElement
   | DoorElement
   | WindowElement
   | POIElement
+  | PosterElement
   | NavPathElement
   | NavNodeElement
 
@@ -189,6 +233,8 @@ export interface GeoJSONCollection {
     name: string
     scale: number
     unit: string
+    coordinateSystem?: 'relative' | 'geographic' // Coordinate system type
+    origin?: string              // Origin point description (e.g., 'canvas_topleft')
     floor?: number
     floorName?: string
     [key: string]: any
