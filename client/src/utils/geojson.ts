@@ -243,12 +243,53 @@ function posterToFeature(poster: PosterElement): GeoJSONFeature {
       id: poster.id,
       name: poster.name,
       floor: poster.floor,
-      rotation: poster.rotation || "'0,1'",
+      rotation: poster.rotation || '0,1',
       multi_door: '0',
       door: `${poster.position.x},${poster.position.y}`,
       vertex: '', // Posters typically don't have vertex in Python format
       vertex_id: poster.vertexId || '',
       style: poster.style
+    }
+  }
+}
+
+// Convert door element to GeoJSON feature
+function doorToFeature(door: any): GeoJSONFeature {
+  return {
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: pointToCoords(door.position)
+    },
+    properties: {
+      type: 'door',
+      id: door.id,
+      name: door.name,
+      floor: door.floor,
+      width: door.width,
+      rotation: door.rotation,
+      openDirection: door.openDirection,
+      style: door.style
+    }
+  }
+}
+
+// Convert window element to GeoJSON feature
+function windowToFeature(window: any): GeoJSONFeature {
+  return {
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: pointToCoords(window.position)
+    },
+    properties: {
+      type: 'window',
+      id: window.id,
+      name: window.name,
+      floor: window.floor,
+      width: window.width,
+      rotation: window.rotation,
+      style: window.style
     }
   }
 }
@@ -298,6 +339,10 @@ export function elementToFeature(element: MapElement, options?: { skipNavPath?: 
       return navPathToFeature(element as NavPathElement)
     case 'navnode':
       return navNodeToFeature(element as NavNodeElement)
+    case 'door':
+      return doorToFeature(element as any)
+    case 'window':
+      return windowToFeature(element as any)
     default:
       throw new Error(`Unknown element type: ${(element as any).type}`)
   }
@@ -403,7 +448,7 @@ function featureToElement(feature: GeoJSONFeature): MapElement | null {
   const type = props.type
 
   const baseProps = {
-    id: props.id || `imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: `imported-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,  // Always generate new ID to avoid collisions
     floor: props.floor || 1,
     name: props.name,
     visible: true,
@@ -525,6 +570,25 @@ function featureToElement(feature: GeoJSONFeature): MapElement | null {
         rotation: props.rotation,
         vertexId: props.vertex_id
       } as PosterElement
+
+    case 'door':
+      return {
+        ...baseProps,
+        type: 'door',
+        position: coordToPoint(feature.geometry.coordinates as number[]),
+        width: props.width || 90,
+        rotation: props.rotation || 0,
+        openDirection: props.openDirection || 'right'
+      } as any
+
+    case 'window':
+      return {
+        ...baseProps,
+        type: 'window',
+        position: coordToPoint(feature.geometry.coordinates as number[]),
+        width: props.width || 100,
+        rotation: props.rotation || 0
+      } as any
 
     case 'navpath':
       return {

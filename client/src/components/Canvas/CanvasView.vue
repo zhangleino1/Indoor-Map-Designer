@@ -1235,9 +1235,10 @@ function handleMouseUp(e: MouseEvent) {
 
   isDragging.value = false
   startDragPos.value = null
-  
-  // 如果正在用房间工具绘制，鼠标释放时完成绘制
-  if (isDrawing.value && currentTool.value === 'room') {
+
+  // 如果正在用房间/走廊/大厅工具拖动绘制，鼠标释放时完成绘制
+  const dragTools = ['room', 'corridor', 'hall']
+  if (isDrawing.value && dragTools.includes(currentTool.value)) {
     const points = drawingPoints.value
     if (points.length >= 2) {
       const rect = createRectangle(points[0], points[points.length - 1])
@@ -1247,7 +1248,14 @@ function handleMouseUp(e: MouseEvent) {
       // 最小尺寸为 5 个画布单位（不受缩放影响）
       const minSize = 5
       if (width > minSize && height > minSize) {
-        elementsStore.createRoom(currentFloor.value, rect)
+        // Create element based on tool type
+        if (currentTool.value === 'room') {
+          elementsStore.createRoom(currentFloor.value, rect)
+        } else if (currentTool.value === 'corridor') {
+          elementsStore.createCorridor(currentFloor.value, rect)
+        } else if (currentTool.value === 'hall') {
+          elementsStore.createHall(currentFloor.value, rect)
+        }
       }
     }
     editorStore.cancelDrawing()
@@ -1372,26 +1380,31 @@ function finishDrawing() {
   const tool = currentTool.value
   const floor = currentFloor.value
 
+  // Skip if this was a drag tool (already handled in handleMouseUp)
+  const dragTools = ['room', 'corridor', 'hall']
+  if (dragTools.includes(tool) && points.length === 2) {
+    // This will be handled by handleMouseUp, don't create duplicate
+    return
+  }
+
   switch (tool) {
     case 'wall':
       elementsStore.createWall(floor, points)
       break
     case 'room':
-      if (points.length >= 2) {
-        const rect = createRectangle(points[0], points[points.length - 1])
-        elementsStore.createRoom(floor, rect)
+      // Only create from finishDrawing if using polygon mode (3+ points)
+      if (points.length >= 3) {
+        elementsStore.createRoom(floor, [...points, points[0]])
       }
       break
     case 'corridor':
-      if (points.length >= 2) {
-        const rect = createRectangle(points[0], points[points.length - 1])
-        elementsStore.createCorridor(floor, rect)
+      if (points.length >= 3) {
+        elementsStore.createCorridor(floor, [...points, points[0]])
       }
       break
     case 'hall':
-      if (points.length >= 2) {
-        const rect = createRectangle(points[0], points[points.length - 1])
-        elementsStore.createHall(floor, rect)
+      if (points.length >= 3) {
+        elementsStore.createHall(floor, [...points, points[0]])
       }
       break
     case 'polygon':

@@ -19,7 +19,7 @@ import type {
 
 // Generate unique ID
 function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
 
 // Default styles
@@ -136,6 +136,9 @@ export const useElementsStore = defineStore('elements', () => {
     endNodeId?: string,
     distance?: number
   ): string {
+    // Temporarily disable history during auto-association
+    const wasRecordingHistory = historyIndex.value
+
     const pathId = addElement({
       type: 'navpath',
       floor,
@@ -146,14 +149,17 @@ export const useElementsStore = defineStore('elements', () => {
       distance
     } as Omit<NavPathElement, 'id' | 'visible' | 'locked' | 'style'>)
 
-    // Auto-associate with connected nodes
+    const nodesToUpdate: Array<{ id: string, oldPaths: string[], newPaths: string[] }> = []
+
+    // Auto-associate with connected nodes (without creating history entries)
     if (startNodeId) {
       const startNode = getElementById(startNodeId) as NavNodeElement | undefined
       if (startNode && startNode.type === 'navnode') {
         if (!startNode.connectedPaths.includes(pathId)) {
-          updateElement(startNodeId, {
-            connectedPaths: [...startNode.connectedPaths, pathId]
-          })
+          const oldPaths = [...startNode.connectedPaths]
+          const newPaths = [...startNode.connectedPaths, pathId]
+          startNode.connectedPaths = newPaths
+          nodesToUpdate.push({ id: startNodeId, oldPaths, newPaths })
         }
       }
     }
@@ -162,24 +168,77 @@ export const useElementsStore = defineStore('elements', () => {
       const endNode = getElementById(endNodeId) as NavNodeElement | undefined
       if (endNode && endNode.type === 'navnode') {
         if (!endNode.connectedPaths.includes(pathId)) {
-          updateElement(endNodeId, {
-            connectedPaths: [...endNode.connectedPaths, pathId]
-          })
+          const oldPaths = [...endNode.connectedPaths]
+          const newPaths = [...endNode.connectedPaths, pathId]
+          endNode.connectedPaths = newPaths
+          nodesToUpdate.push({ id: endNodeId, oldPaths, newPaths })
         }
       }
+    }
+
+    // Record a single batch history entry for path creation + node associations
+    if (nodesToUpdate.length > 0) {
+      const path = getElementById(pathId)
+      const updatedNodes = nodesToUpdate.map(n => getElementById(n.id)!).filter(Boolean)
+
+      // Remove the last history entry (path creation) and replace with batch
+      if (history.value.length > 0) {
+        history.value.pop()
+        historyIndex.value--
+      }
+
+      // Add batch entry
+      pushHistory({
+        type: 'batch',
+        elements: [path!, ...updatedNodes],
+        previousState: [
+          path!,
+          ...nodesToUpdate.map(n => {
+            const node = getElementById(n.id)!
+            return { ...node, connectedPaths: n.oldPaths } as MapElement
+          })
+        ]
+      })
     }
 
     return pathId
   }
 
   // Create navigation node
-  function createNavNode(floor: number, position: Point): string {
-    return addElement({
+  function createNavNode(floor: number, position: Point, id?: string): string {
+    // Extract index from ID if provided, or generate sequential ID
+    let nodeId = id
+    let index: number | undefined
+
+    if (nodeId) {
+      const validation = validateNavNodeId(nodeId)
+      if (validation.valid) {
+        index = validation.index
+      }
+    } else {
+      // Auto-generate ID with default corridor 'a'
+      nodeId = generateNavNodeId(floor, 'a')
+      const validation = validateNavNodeId(nodeId)
+      index = validation.index
+    }
+
+    const elementId = addElement({
       type: 'navnode',
       floor,
       position: { ...position },
-      connectedPaths: []
+      connectedPaths: [],
+      index
     } as Omit<NavNodeElement, 'id' | 'visible' | 'locked' | 'style'>)
+
+    // Update the generated element with custom ID if provided
+    if (id) {
+      const element = getElementById(elementId)
+      if (element) {
+        (element as any).id = id
+      }
+    }
+
+    return elementId
   }
 
   // Create door
@@ -267,16 +326,36 @@ export const useElementsStore = defineStore('elements', () => {
       const index = elements.findIndex(el => el.id === id)
       if (index !== -1) {
         const element = elements[index]
+        const affectedElements: MapElement[] = [element]
+        const previousStates: MapElement[] = [{ ...element }]
 
-        // Clean up associations before deleting
+        // Clean up associations before deleting (without creating separate history entries)
         if (element.type === 'navpath') {
           // Remove this path from connected nodes
           const navPath = element as NavPathElement
           if (navPath.startNodeId) {
-            cleanupNavNodePath(navPath.startNodeId, id)
+            const startNode = getElementById(navPath.startNodeId) as NavNodeElement | undefined
+            if (startNode && startNode.type === 'navnode') {
+              const oldPaths = [...startNode.connectedPaths]
+              const newPaths = startNode.connectedPaths.filter(pid => pid !== id)
+              if (oldPaths.length !== newPaths.length) {
+                previousStates.push({ ...startNode })
+                startNode.connectedPaths = newPaths
+                affectedElements.push(startNode)
+              }
+            }
           }
           if (navPath.endNodeId && navPath.endNodeId !== navPath.startNodeId) {
-            cleanupNavNodePath(navPath.endNodeId, id)
+            const endNode = getElementById(navPath.endNodeId) as NavNodeElement | undefined
+            if (endNode && endNode.type === 'navnode') {
+              const oldPaths = [...endNode.connectedPaths]
+              const newPaths = endNode.connectedPaths.filter(pid => pid !== id)
+              if (oldPaths.length !== newPaths.length) {
+                previousStates.push({ ...endNode })
+                endNode.connectedPaths = newPaths
+                affectedElements.push(endNode)
+              }
+            }
           }
         } else if (element.type === 'navnode') {
           // Remove node reference from connected paths
@@ -284,6 +363,7 @@ export const useElementsStore = defineStore('elements', () => {
           navNode.connectedPaths.forEach(pathId => {
             const path = getElementById(pathId) as NavPathElement | undefined
             if (path && path.type === 'navpath') {
+              const oldPath = { ...path }
               const updates: Partial<NavPathElement> = {}
               if (path.startNodeId === id) {
                 updates.startNodeId = undefined
@@ -292,16 +372,21 @@ export const useElementsStore = defineStore('elements', () => {
                 updates.endNodeId = undefined
               }
               if (Object.keys(updates).length > 0) {
-                updateElement(pathId, updates)
+                Object.assign(path, updates)
+                previousStates.push(oldPath)
+                affectedElements.push(path)
               }
             }
           })
         }
 
         const deleted = elements.splice(index, 1)
+
+        // Push single batch history entry for deletion + cleanups
         pushHistory({
-          type: 'delete',
-          elements: deleted
+          type: affectedElements.length > 1 ? 'batch' : 'delete',
+          elements: deleted,
+          previousState: affectedElements.length > 1 ? previousStates : undefined
         })
         return
       }
