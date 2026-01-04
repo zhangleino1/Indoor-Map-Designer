@@ -75,6 +75,9 @@ const dimensionPos = ref<Point>({ x: 0, y: 0 })
 // Snap type for visual feedback
 const currentSnapType = ref<'none' | 'grid' | 'endpoint' | 'midpoint'>('none')
 
+// ResizeObserver for container size changes
+let resizeObserver: ResizeObserver | null = null
+
 const dimensionLabelStyle = computed(() => ({
   left: `${dimensionPos.value.x}px`,
   top: `${dimensionPos.value.y}px`
@@ -93,7 +96,14 @@ onMounted(() => {
 
   ctx.value = canvasRef.value.getContext('2d')
   resizeCanvas()
-  window.addEventListener('resize', resizeCanvas)
+
+  // Use ResizeObserver to watch container size changes
+  // This handles both drag-resize and maximize/restore events
+  resizeObserver = new ResizeObserver(() => {
+    resizeCanvas()
+  })
+  resizeObserver.observe(containerRef.value)
+
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
   window.addEventListener('saveDrawing', handleSaveDrawingEvent as EventListener)
@@ -103,7 +113,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', resizeCanvas)
+  // Disconnect ResizeObserver
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
   window.removeEventListener('saveDrawing', handleSaveDrawingEvent as EventListener)
