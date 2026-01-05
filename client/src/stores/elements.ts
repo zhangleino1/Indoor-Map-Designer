@@ -529,6 +529,45 @@ export const useElementsStore = defineStore('elements', () => {
     }
   }
 
+  // Update element points (for walls, paths, polygons, rooms)
+  function updateElementPoints(id: string, points: Point[]) {
+    const element = getElementById(id)
+    if (!element) return
+
+    // Only works for elements with points array
+    if (!('points' in element)) return
+
+    updateElement(id, { points: [...points] } as Partial<MapElement>)
+  }
+
+  // Remove a point from element by index
+  function removePointFromElement(id: string, pointIndex: number) {
+    const element = getElementById(id)
+    if (!element) return
+
+    // Only works for elements with points array
+    if (!('points' in element)) return
+
+    const newPoints = [...element.points]
+    newPoints.splice(pointIndex, 1)
+
+    // Determine minimum points required
+    let minPoints = 2
+    if (element.type === 'room' || element.type === 'polygon' ||
+        element.type === 'corridor' || element.type === 'hall') {
+      minPoints = 3 // Polygons need at least 3 points
+    }
+
+    // If not enough points left, delete the entire element
+    if (newPoints.length < minPoints) {
+      deleteElement(id)
+      return
+    }
+
+    // Update with new points
+    updateElement(id, { points: newPoints } as Partial<MapElement>)
+  }
+
   // History management
   function pushHistory(action: HistoryAction) {
     // Remove any redo history
@@ -760,6 +799,8 @@ export const useElementsStore = defineStore('elements', () => {
     deleteElement,
     deleteElements,
     moveElement,
+    updateElementPoints,
+    removePointFromElement,
     undo,
     redo,
     canUndo,

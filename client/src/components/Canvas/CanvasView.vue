@@ -76,6 +76,12 @@ const dimensionPos = ref<Point>({ x: 0, y: 0 })
 // Snap type for visual feedback
 const currentSnapType = ref<'none' | 'grid' | 'endpoint' | 'midpoint'>('none')
 
+// Control point editing state
+const hoveredControlPoint = ref<{ elementId: string; pointIndex: number } | null>(null)
+const selectedControlPoint = ref<{ elementId: string; pointIndex: number } | null>(null)
+const isDraggingControlPoint = ref(false)
+const controlPointDragStart = ref<Point | null>(null)
+
 // ResizeObserver for container size changes
 let resizeObserver: ResizeObserver | null = null
 
@@ -991,14 +997,31 @@ function drawSelectionHighlight(c: CanvasRenderingContext2D, element: MapElement
     }
     c.stroke()
 
-    // Draw control points
+    // Draw control points (editable)
     c.setLineDash([])
-    c.fillStyle = '#fff'
-    c.strokeStyle = '#409eff'
-    for (const point of element.points) {
+    for (let i = 0; i < element.points.length; i++) {
+      const point = element.points[i]
+      const isHovered = hoveredControlPoint.value?.elementId === element.id &&
+                        hoveredControlPoint.value?.pointIndex === i
+      const isSelected = selectedControlPoint.value?.elementId === element.id &&
+                         selectedControlPoint.value?.pointIndex === i
+
       c.beginPath()
-      c.arc(point.x, point.y, 5, 0, Math.PI * 2)
+      c.arc(point.x, point.y, isHovered || isSelected ? 7 : 5, 0, Math.PI * 2)
+
+      // Fill color based on state
+      if (isSelected) {
+        c.fillStyle = '#409eff' // Blue for selected
+      } else if (isHovered) {
+        c.fillStyle = '#67C23A' // Green for hovered
+      } else {
+        c.fillStyle = '#fff' // White for normal
+      }
       c.fill()
+
+      // Stroke
+      c.strokeStyle = isSelected || isHovered ? '#303133' : '#409eff'
+      c.lineWidth = isSelected || isHovered ? 2.5 : 2
       c.stroke()
     }
   } else if ('position' in element && element.position) {
@@ -1008,6 +1031,30 @@ function drawSelectionHighlight(c: CanvasRenderingContext2D, element: MapElement
   }
 
   c.restore()
+}
+
+// Helper: Get control point at canvas position
+function getControlPointAt(canvasPos: Point): { elementId: string; pointIndex: number } | null {
+  const threshold = 10 / zoom.value // Hit test threshold in canvas units
+
+  // Only check selected elements with points
+  for (const id of selectedIds.value) {
+    const element = elementsStore.getElementById(id)
+    if (!element || !('points' in element)) continue
+
+    for (let i = 0; i < element.points.length; i++) {
+      const point = element.points[i]
+      const dx = canvasPos.x - point.x
+      const dy = canvasPos.y - point.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      if (distance <= threshold) {
+        return { elementId: id, pointIndex: i }
+      }
+    }
+  }
+
+  return null
 }
 
 function drawDrawingPreview(c: CanvasRenderingContext2D) {
@@ -1188,6 +1235,15 @@ function handleMouseDown(e: MouseEvent) {
   const tool = currentTool.value
 
   if (tool === 'select') {
+    // Check if clicking on a control point first
+    const controlPoint = getControlPointAt(canvasPos)
+    if (controlPoint) {
+      selectedControlPoint.value = controlPoint
+      isDraggingControlPoint.value = true
+      controlPointDragStart.value = canvasPos
+      return
+    }
+
     // Check if clicking on an element
     const clickedElement = findElementAtPoint(canvasPos)
 
@@ -1261,6 +1317,19 @@ function handleMouseMove(e: MouseEvent) {
   // Update dimension label position
   dimensionPos.value = { x: screenPos.x + 15, y: screenPos.y - 25 }
 
+  // Handle control point dragging
+  if (isDraggingControlPoint.value && selectedControlPoint.value) {
+    const element = elementsStore.getElementById(selectedControlPoint.value.elementId)
+    if (element && 'points' in element) {
+      const newPoints = [...element.points]
+      const snappedPos = getSnappedPosition(canvasPos)
+      newPoints[selectedControlPoint.value.pointIndex] = snappedPos
+      elementsStore.updateElementPoints(selectedControlPoint.value.elementId, newPoints)
+    }
+    render()
+    return
+  }
+
   if (isPanning.value) {
     const dx = screenPos.x - lastMousePos.value.x
     const dy = screenPos.y - lastMousePos.value.y
@@ -1304,6 +1373,13 @@ function handleMouseMove(e: MouseEvent) {
   } else {
     currentDimension.value = ''
     editorStore.setHoverPoint(null)
+
+    // Update hovered control point
+    const controlPoint = getControlPointAt(canvasPos)
+    hoveredControlPoint.value = controlPoint
+    if (controlPoint) {
+      render() // Re-render to show hover effect
+    }
   }
 
   lastMousePos.value = screenPos
@@ -1313,6 +1389,14 @@ function handleMouseUp(e: MouseEvent) {
   // Stop panning on middle button release or left button release (when space panning)
   if (e.button === 1 || (e.button === 0 && isPanning.value)) {
     isPanning.value = false
+    return
+  }
+
+  // Stop control point dragging
+  if (isDraggingControlPoint.value) {
+    isDraggingControlPoint.value = false
+    controlPointDragStart.value = null
+    // Keep control point selected for deletion
     return
   }
 
@@ -1427,7 +1511,14 @@ function handleKeyDown(e: KeyboardEvent) {
       }
       break
     case 'delete':
-      if (selectedIds.value.length > 0 && !isDrawing.value) {
+      // If a control point is selected, delete it
+      if (selectedControlPoint.value) {
+        elementsStore.removePointFromElement(
+          selectedControlPoint.value.elementId,
+          selectedControlPoint.value.pointIndex
+        )
+        selectedControlPoint.value = null
+      } else if (selectedIds.value.length > 0 && !isDrawing.value) {
         elementsStore.deleteElements(selectedIds.value)
         editorStore.clearSelection()
       }
@@ -1440,7 +1531,18 @@ function handleKeyDown(e: KeyboardEvent) {
           editorStore.cancelDrawing()
           currentDimension.value = ''
         }
+      } else if (selectedIds.value.length === 1) {
+        // If a single element with points is selected, delete its last point
+        const element = elementsStore.getElementById(selectedIds.value[0])
+        if (element && 'points' in element && element.points.length > 0) {
+          elementsStore.removePointFromElement(element.id, element.points.length - 1)
+        } else {
+          // Otherwise delete the element
+          elementsStore.deleteElements(selectedIds.value)
+          editorStore.clearSelection()
+        }
       } else if (selectedIds.value.length > 0) {
+        // Multiple elements selected, delete all
         elementsStore.deleteElements(selectedIds.value)
         editorStore.clearSelection()
       }
