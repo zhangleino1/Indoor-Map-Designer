@@ -83,20 +83,9 @@ export function generate3DPreviewHTML(geojsonData: any): string {
         <button class="btn btn-secondary active" id="btn-labels" onclick="toggleLabels()">标签</button>
       </div>
     </div>
-    <div class="control-group">
-      <label>房间信息</label>
-      <div id="room-info">将鼠标悬停在房间上查看详情</div>
-    </div>
-    <div class="legend">
-      <div class="legend-item"><div class="legend-color" style="background: #E8F4F8; border: 1px solid #666;"></div><span>房间区域</span></div>
-      <div class="legend-item"><div class="legend-color" style="background: #333;"></div><span>墙壁</span></div>
-      <div class="legend-item"><div class="legend-color" style="background: #DEB887;"></div><span>门</span></div>
-      <div class="legend-item"><div class="legend-color" style="background: #87CEEB;"></div><span>窗户</span></div>
-      <div class="legend-item"><div class="legend-color" style="background: #4CAF50;"></div><span>导航路径</span></div>
-    </div>
   </div>
-  <div class="tooltip" id="tooltip"></div>
   <div id="controls-hint">🖱️ 左键拖动旋转 | 滚轮缩放 | 右键拖动平移</div>
+
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -105,7 +94,6 @@ export function generate3DPreviewHTML(geojsonData: any): string {
 
     let scene, camera, renderer, controls;
     let wallsGroup, navPathGroup, labelsGroup;
-    let roomMeshes = [];
     const scale = 0.01;
     const wallHeight = 2.5;
     const floorY = 0;
@@ -157,7 +145,6 @@ export function generate3DPreviewHTML(geojsonData: any): string {
       parseGeoJSON();
 
       window.addEventListener('resize', onWindowResize);
-      renderer.domElement.addEventListener('mousemove', onMouseMove);
 
       setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500);
       animate();
@@ -223,29 +210,13 @@ export function generate3DPreviewHTML(geojsonData: any): string {
     }
 
     function createRoom(coords, props) {
-      const shape = new THREE.Shape();
-      coords.forEach((c, i) => { i === 0 ? shape.moveTo(c[0] * scale, c[1] * scale) : shape.lineTo(c[0] * scale, c[1] * scale); });
-      const floorGeom = new THREE.ShapeGeometry(shape);
-      const color = roomColors[props.name] || colors.floor;
-      const floor = new THREE.Mesh(floorGeom, new THREE.MeshStandardMaterial({ color, roughness: 0.8, metalness: 0.1, side: THREE.DoubleSide }));
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.y = floorY + 0.01;
-      floor.receiveShadow = true;
-      floor.userData = { type: 'room', name: props.name || '房间', area: props.area ? (props.area / 10000).toFixed(1) : '未知' };
-      roomMeshes.push(floor);
-      scene.add(floor);
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(floorGeom), new THREE.LineBasicMaterial({ color: 0x666666 }));
-      edges.rotation.x = -Math.PI / 2;
-      edges.position.y = floorY + 0.02;
-      scene.add(edges);
-      
       // Create walls around room perimeter
       const roomWallThickness = 0.06;
       for (let i = 0; i < coords.length - 1; i++) {
         const [x1, z1] = [coords[i][0] * scale, coords[i][1] * scale];
         const [x2, z2] = [coords[i+1][0] * scale, coords[i+1][1] * scale];
         const len = Math.sqrt((x2-x1)**2 + (z2-z1)**2);
-        if (len < 0.01) continue; // Skip very short segments
+        if (len < 0.01) continue;
         const angle = Math.atan2(z2-z1, x2-x1);
         const wall = new THREE.Mesh(
           new THREE.BoxGeometry(len, wallHeight, roomWallThickness),
@@ -347,29 +318,6 @@ export function generate3DPreviewHTML(geojsonData: any): string {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    const tooltip = document.getElementById('tooltip');
-
-    function onMouseMove(e) {
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(roomMeshes);
-      if (intersects.length > 0) {
-        const info = intersects[0].object.userData;
-        document.getElementById('room-info').innerHTML = '<strong>' + info.name + '</strong><br>面积: ' + info.area + ' m²';
-        tooltip.textContent = info.name;
-        tooltip.style.left = e.clientX + 15 + 'px';
-        tooltip.style.top = e.clientY + 15 + 'px';
-        tooltip.classList.add('visible');
-        document.body.style.cursor = 'pointer';
-      } else {
-        tooltip.classList.remove('visible');
-        document.body.style.cursor = 'default';
-      }
     }
 
     function animate() {
