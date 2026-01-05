@@ -115,7 +115,7 @@
           <el-icon :size="20"><LocationFilled /></el-icon>
         </button>
       </el-tooltip>
-      
+
       <!-- POI 类型选择器 -->
       <el-popover
         v-if="currentTool === 'poi'"
@@ -141,6 +141,16 @@
           </div>
         </div>
       </el-popover>
+
+      <el-tooltip content="文本标签 (T)" placement="right">
+        <button
+          class="tool-btn"
+          :class="{ active: currentTool === 'text' }"
+          @click="setTool('text')"
+        >
+          <el-icon :size="20"><EditPen /></el-icon>
+        </button>
+      </el-tooltip>
     </div>
 
 
@@ -181,7 +191,8 @@ import {
   Guide,
   Delete,
   DeleteFilled,
-  Aim
+  Aim,
+  EditPen
 } from '@element-plus/icons-vue'
 import { useEditorStore } from '@/stores/editor'
 import { useElementsStore } from '@/stores/elements'
