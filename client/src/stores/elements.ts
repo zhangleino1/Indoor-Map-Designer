@@ -38,6 +38,14 @@ const defaultStyles: Record<string, ElementStyle> = {
   navnode: { strokeColor: '#2196F3', strokeWidth: 2, fillColor: '#64B5F6', opacity: 1 }
 }
 
+// Configuration constants
+const CONFIG = {
+  MAX_HISTORY_LENGTH: 50,
+  DEFAULT_DOOR_WIDTH: 90,
+  DEFAULT_WINDOW_WIDTH: 100,
+  DEFAULT_WALL_THICKNESS: 1.5
+}
+
 export const useElementsStore = defineStore('elements', () => {
   // All elements indexed by floor
   const elementsByFloor = ref<Record<number, MapElement[]>>({
@@ -47,7 +55,6 @@ export const useElementsStore = defineStore('elements', () => {
   // History for undo/redo
   const history = ref<HistoryAction[]>([])
   const historyIndex = ref<number>(-1)
-  const maxHistoryLength = 50
 
   // Computed: get elements for current floor
   function getElementsByFloor(floor: number): MapElement[] {
@@ -95,7 +102,7 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Create wall
-  function createWall(floor: number, points: Point[], thickness: number = 1.5): string {
+  function createWall(floor: number, points: Point[], thickness: number = CONFIG.DEFAULT_WALL_THICKNESS): string {
     return addElement({
       type: 'wall',
       floor,
@@ -138,8 +145,6 @@ export const useElementsStore = defineStore('elements', () => {
     endNodeId?: string,
     distance?: number
   ): string {
-    // Temporarily disable history during auto-association
-    const wasRecordingHistory = historyIndex.value
 
     const pathId = addElement({
       type: 'navpath',
@@ -208,43 +213,54 @@ export const useElementsStore = defineStore('elements', () => {
 
   // Create navigation node
   function createNavNode(floor: number, position: Point, id?: string): string {
-    // Extract index from ID if provided, or generate sequential ID
-    let nodeId = id
+    // Determine final ID BEFORE adding element (fixes history consistency)
+    let finalId: string
     let index: number | undefined
 
-    if (nodeId) {
-      const validation = validateNavNodeId(nodeId)
+    if (id) {
+      // Use provided ID
+      finalId = id
+      const validation = validateNavNodeId(id)
       if (validation.valid) {
         index = validation.index
       }
     } else {
       // Auto-generate ID with default corridor 'a'
-      nodeId = generateNavNodeId(floor, 'a')
-      const validation = validateNavNodeId(nodeId)
+      finalId = generateNavNodeId(floor, 'a')
+      const validation = validateNavNodeId(finalId)
       index = validation.index
     }
 
-    const elementId = addElement({
+    // Create element with pre-determined ID directly (bypass addElement to avoid ID regeneration)
+    if (!elementsByFloor.value[floor]) {
+      elementsByFloor.value[floor] = []
+    }
+
+    const newElement: NavNodeElement = {
+      id: finalId,
       type: 'navnode',
       floor,
       position: { ...position },
       connectedPaths: [],
-      index
-    } as Omit<NavNodeElement, 'id' | 'visible' | 'locked' | 'style'>)
-
-    // Update the generated element with custom ID if provided
-    if (id) {
-      const element = getElementById(elementId)
-      if (element) {
-        (element as any).id = id
-      }
+      index,
+      visible: true,
+      locked: false,
+      style: { ...defaultStyles['navnode'] }
     }
 
-    return elementId
+    elementsByFloor.value[floor].push(newElement)
+
+    // Add to history with correct ID
+    pushHistory({
+      type: 'add',
+      elements: [newElement]
+    })
+
+    return finalId
   }
 
   // Create door
-  function createDoor(floor: number, position: Point, width: number = 90, rotation: number = 0): string {
+  function createDoor(floor: number, position: Point, width: number = CONFIG.DEFAULT_DOOR_WIDTH, rotation: number = 0): string {
     return addElement({
       type: 'door',
       floor,
@@ -256,7 +272,7 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Create window
-  function createWindow(floor: number, position: Point, width: number = 100, rotation: number = 0): string {
+  function createWindow(floor: number, position: Point, width: number = CONFIG.DEFAULT_WINDOW_WIDTH, rotation: number = 0): string {
     return addElement({
       type: 'window',
       floor,
@@ -425,19 +441,6 @@ export const useElementsStore = defineStore('elements', () => {
     }
   }
 
-  // Helper: Remove path from node's connectedPaths
-  function cleanupNavNodePath(nodeId: string, pathId: string) {
-    const node = getElementById(nodeId) as NavNodeElement | undefined
-    if (node && node.type === 'navnode') {
-      const newConnectedPaths = node.connectedPaths.filter(id => id !== pathId)
-      if (newConnectedPaths.length !== node.connectedPaths.length) {
-        updateElement(nodeId, {
-          connectedPaths: newConnectedPaths
-        })
-      }
-    }
-  }
-
   // Helper: Validate NavNode ID format (Python format: a1, b2, c3, etc.)
   function validateNavNodeId(id: string): { valid: boolean; corridor?: string; index?: number; error?: string } {
     const match = id.match(/^([a-z]+)(\d+)$/i)
@@ -457,11 +460,11 @@ export const useElementsStore = defineStore('elements', () => {
   // Helper: Get NavNodes in same corridor
   function getCorridorNavNodes(corridorId: string, floor?: number): NavNodeElement[] {
     const nodes: NavNodeElement[] = []
-    const floorsToCheck = floor !== undefined ? [floor] : Object.keys(elementsByFloor.value)
+    const floorsToCheck: (number | string)[] = floor !== undefined ? [floor] : Object.keys(elementsByFloor.value)
 
-    floorsToCheck.forEach(f => {
-      const elements = elementsByFloor.value[f] || []
-      elements.forEach(el => {
+    floorsToCheck.forEach((f: number | string) => {
+      const elements = elementsByFloor.value[f as number] || []
+      elements.forEach((el: MapElement) => {
         if (el.type === 'navnode') {
           const validation = validateNavNodeId(el.id)
           if (validation.valid && validation.corridor === corridorId.toLowerCase()) {
@@ -624,8 +627,7 @@ export const useElementsStore = defineStore('elements', () => {
 
     // Determine minimum points required
     let minPoints = 2
-    if (element.type === 'room' || element.type === 'polygon' ||
-        element.type === 'corridor' || element.type === 'hall') {
+    if (element.type === 'room' || element.type === 'corridor' || element.type === 'hall') {
       minPoints = 3 // Polygons need at least 3 points
     }
 
@@ -647,7 +649,7 @@ export const useElementsStore = defineStore('elements', () => {
     historyIndex.value++
 
     // Limit history length
-    if (history.value.length > maxHistoryLength) {
+    if (history.value.length > CONFIG.MAX_HISTORY_LENGTH) {
       history.value.shift()
       historyIndex.value--
     }

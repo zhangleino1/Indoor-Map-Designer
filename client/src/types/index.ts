@@ -37,6 +37,7 @@ export type ElementType =
   | 'window'
   | 'poi'
   | 'poster'
+  | 'text'
   | 'navpath'
   | 'navnode'
 

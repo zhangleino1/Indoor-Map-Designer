@@ -1,0 +1,1229 @@
+{
+  "type": "FeatureCollection",
+  "properties": {
+    "name": "室内地图",
+    "scale": 1,
+    "unit": "m",
+    "coordinateSystem": "relative",
+    "origin": "canvas_topleft",
+    "format_version": "2.0",
+    "edge_type": "explicit"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              0,
+              0
+            ],
+            [
+              320,
+              0
+            ],
+            [
+              320,
+              370
+            ],
+            [
+              0,
+              370
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "type": "room",
+        "id": "1767595069750-g5glmkwtf",
+        "multi_door": "0",
+        "door": "",
+        "vertex": "",
+        "vertex_id": "",
+        "floor": 1,
+        "area": 118400,
+        "style": {
+          "strokeColor": "#666666",
+          "strokeWidth": 2,
+          "fillColor": "#E8F4F8",
+          "opacity": 0.5
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            161.2040631336522,
+            -1.2040631336522267
+          ],
+          [
+            161.2040631336522,
+            -181.20406313365223
+          ],
+          [
+            321.2040631336522,
+            -181.20406313365223
+          ],
+          [
+            321.2040631336522,
+            -231.20406313365223
+          ],
+          [
+            501.2040631336522,
+            -231.20406313365223
+          ],
+          [
+            501.2040631336522,
+            -181.20406313365223
+          ],
+          [
+            671.2040631336522,
+            -181.20406313365223
+          ],
+          [
+            671.2040631336522,
+            -291.2040631336522
+          ],
+          [
+            1130,
+            -290
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767595209726-ujrfe3aqe",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 2,
+        "length": 1358.79751683406,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            671.2040631336522,
+            -181.20406313365223
+          ],
+          [
+            670,
+            -70
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767597969710-vtk0oym7o",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 111.21058144557617,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            1130,
+            -290
+          ],
+          [
+            1130,
+            -70
+          ],
+          [
+            990,
+            -70
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598018361-o3fhwjfq2",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 360,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            990,
+            -70
+          ],
+          [
+            670,
+            -70
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598127889-n4psl9qnz",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 320,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          714.7966131045373,
+          -68.83050870034903
+        ]
+      },
+      "properties": {
+        "type": "door",
+        "id": "1767598130649-98x0huqt8",
+        "floor": 1,
+        "width": 90,
+        "rotation": 0,
+        "openDirection": "right",
+        "style": {
+          "strokeColor": "#8B4513",
+          "strokeWidth": 2,
+          "fillColor": "#DEB887",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            670,
+            80
+          ],
+          [
+            990,
+            80
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598274091-9q8k2swdg",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 320,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              603.3271915314461,
+              369.33889137428133
+            ],
+            [
+              863.3271915314461,
+              369.33889137428133
+            ],
+            [
+              863.3271915314461,
+              629.3388913742809
+            ],
+            [
+              603.3271915314461,
+              629.3388913742809
+            ],
+            [
+              603.3271915314461,
+              369.33889137428133
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "type": "room",
+        "id": "1767598412462-wfwlqk32c",
+        "multi_door": "0",
+        "door": "",
+        "vertex": "",
+        "vertex_id": "",
+        "floor": 1,
+        "area": 67600,
+        "style": {
+          "strokeColor": "#666666",
+          "strokeWidth": 2,
+          "fillColor": "#E8F4F8",
+          "opacity": 0.5
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            670,
+            80
+          ],
+          [
+            670,
+            370
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598545640-lsif6rjba",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 290,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            992.7413319602074,
+            79.50157600723503
+          ],
+          [
+            992.7413319602074,
+            539.501576007235
+          ],
+          [
+            862.7413319602074,
+            539.501576007235
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598592998-m7ktqquih",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 590,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            990,
+            80
+          ],
+          [
+            990,
+            -70
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598612170-2bxmb1t0k",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 150,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          990,
+          5
+        ]
+      },
+      "properties": {
+        "type": "window",
+        "id": "1767598674436-lvey06fge",
+        "floor": 1,
+        "width": 100,
+        "rotation": 90,
+        "style": {
+          "strokeColor": "#4169E1",
+          "strokeWidth": 2,
+          "fillColor": "#87CEEB",
+          "opacity": 0.8
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            770,
+            -70
+          ],
+          [
+            770,
+            80
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598696996-9y69433ew",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 150,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          771.9732788285622,
+          -4.866394142811044
+        ]
+      },
+      "properties": {
+        "type": "door",
+        "id": "1767598698515-w9qmzpw0d",
+        "floor": 1,
+        "width": 90,
+        "rotation": 90,
+        "openDirection": "right",
+        "style": {
+          "strokeColor": "#8B4513",
+          "strokeWidth": 2,
+          "fillColor": "#DEB887",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            320,
+            370
+          ],
+          [
+            603.3271915314461,
+            369.33889137428133
+          ]
+        ]
+      },
+      "properties": {
+        "id": "1767598754476-z7cwsyguw",
+        "type": "wall",
+        "floor": 1,
+        "thickness": 1.5,
+        "length": 283.3279628376129,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 3,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          670,
+          310
+        ]
+      },
+      "properties": {
+        "type": "door",
+        "id": "1767598756426-kyufhiuk7",
+        "floor": 1,
+        "width": 90,
+        "rotation": 90,
+        "openDirection": "right",
+        "style": {
+          "strokeColor": "#8B4513",
+          "strokeWidth": 2,
+          "fillColor": "#DEB887",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          650.3363327271752,
+          370.0492602249786
+        ]
+      },
+      "properties": {
+        "type": "door",
+        "id": "1767598774681-irbiptovl",
+        "floor": 1,
+        "width": 90,
+        "rotation": 180,
+        "openDirection": "right",
+        "style": {
+          "strokeColor": "#8B4513",
+          "strokeWidth": 2,
+          "fillColor": "#DEB887",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              909,
+              -1
+            ],
+            [
+              911,
+              -1
+            ],
+            [
+              911,
+              1
+            ],
+            [
+              909,
+              1
+            ],
+            [
+              909,
+              -1
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "type": "toilet",
+        "id": "1767598823935-dcs91dccw",
+        "multi_door": "0",
+        "door": "910,0",
+        "vertex": "",
+        "vertex_id": "",
+        "floor": 1,
+        "poiType": "toilet",
+        "style": {
+          "strokeColor": "#FF6B6B",
+          "strokeWidth": 2,
+          "fillColor": "#FFE0E0",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          210,
+          -180
+        ]
+      },
+      "properties": {
+        "type": "door",
+        "id": "1767598842627-57h0fkz76",
+        "floor": 1,
+        "width": 90,
+        "rotation": 0,
+        "openDirection": "right",
+        "style": {
+          "strokeColor": "#8B4513",
+          "strokeWidth": 2,
+          "fillColor": "#DEB887",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            210,
+            -180
+          ],
+          [
+            210,
+            -30
+          ],
+          [
+            490,
+            -30
+          ],
+          [
+            500,
+            330
+          ],
+          [
+            820,
+            320
+          ]
+        ]
+      },
+      "properties": {
+        "type": "edge",
+        "id": "1767599002272-yyzydsgh4",
+        "start_node": "",
+        "end_node": "",
+        "bidirectional": true,
+        "distance": 11.102950739790245,
+        "weight": 11.102950739790245,
+        "floor": 1,
+        "style": {
+          "strokeColor": "#4CAF50",
+          "strokeWidth": 2,
+          "opacity": 0.7
+        },
+        "_designer_type": "navpath"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            644.1957321229802,
+            330
+          ],
+          [
+            654.1957321229802,
+            490
+          ]
+        ]
+      },
+      "properties": {
+        "type": "edge",
+        "id": "1767599009478-c8l9ijrzh",
+        "start_node": "",
+        "end_node": "",
+        "bidirectional": true,
+        "distance": 1.6031219541881399,
+        "weight": 1.6031219541881399,
+        "floor": 1,
+        "style": {
+          "strokeColor": "#4CAF50",
+          "strokeWidth": 2,
+          "opacity": 0.7
+        },
+        "_designer_type": "navpath"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            490,
+            10
+          ],
+          [
+            910,
+            0
+          ]
+        ]
+      },
+      "properties": {
+        "type": "edge",
+        "id": "1767599019100-fijusvk5l",
+        "start_node": "",
+        "end_node": "",
+        "bidirectional": true,
+        "distance": 4.201190307520001,
+        "weight": 4.201190307520001,
+        "floor": 1,
+        "style": {
+          "strokeColor": "#4CAF50",
+          "strokeWidth": 2,
+          "opacity": 0.7
+        },
+        "_designer_type": "navpath"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            700,
+            5
+          ],
+          [
+            730,
+            -190
+          ]
+        ]
+      },
+      "properties": {
+        "type": "edge",
+        "id": "1767599024070-70pplttbb",
+        "start_node": "",
+        "end_node": "",
+        "bidirectional": true,
+        "distance": 1.9729419656948857,
+        "weight": 1.9729419656948857,
+        "floor": 1,
+        "style": {
+          "strokeColor": "#4CAF50",
+          "strokeWidth": 2,
+          "opacity": 0.7
+        },
+        "_designer_type": "navpath"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          319.5871963689406,
+          52.58719636894067
+        ]
+      },
+      "properties": {
+        "type": "door",
+        "id": "1767599033392-2uaj6l5g9",
+        "floor": 1,
+        "width": 90,
+        "rotation": 270,
+        "openDirection": "right",
+        "style": {
+          "strokeColor": "#8B4513",
+          "strokeWidth": 2,
+          "fillColor": "#DEB887",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            490,
+            70
+          ],
+          [
+            140,
+            80
+          ]
+        ]
+      },
+      "properties": {
+        "type": "edge",
+        "id": "1767599057032-i612jjc3k",
+        "start_node": "",
+        "end_node": "",
+        "bidirectional": true,
+        "distance": 3.5014282800023193,
+        "weight": 3.5014282800023193,
+        "floor": 1,
+        "style": {
+          "strokeColor": "#4CAF50",
+          "strokeWidth": 2,
+          "opacity": 0.7
+        },
+        "_designer_type": "navpath"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          730,
+          -190
+        ]
+      },
+      "properties": {
+        "type": "point",
+        "id": "1767599060375-u9znx72co",
+        "rotation": "0,1",
+        "index": "1",
+        "floor": 1,
+        "connectedPaths": [],
+        "style": {
+          "strokeColor": "#2196F3",
+          "strokeWidth": 2,
+          "fillColor": "#64B5F6",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          910,
+          0
+        ]
+      },
+      "properties": {
+        "type": "point",
+        "id": "1767599062480-0ol9lxzs4",
+        "rotation": "0,1",
+        "index": "1",
+        "floor": 1,
+        "connectedPaths": [],
+        "style": {
+          "strokeColor": "#2196F3",
+          "strokeWidth": 2,
+          "fillColor": "#64B5F6",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          140,
+          80
+        ]
+      },
+      "properties": {
+        "type": "point",
+        "id": "1767599064885-o019h97ss",
+        "rotation": "0,1",
+        "index": "1",
+        "floor": 1,
+        "connectedPaths": [],
+        "style": {
+          "strokeColor": "#2196F3",
+          "strokeWidth": 2,
+          "fillColor": "#64B5F6",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          820,
+          320
+        ]
+      },
+      "properties": {
+        "type": "point",
+        "id": "1767599067915-grop70k6o",
+        "rotation": "0,1",
+        "index": "1",
+        "floor": 1,
+        "connectedPaths": [],
+        "style": {
+          "strokeColor": "#2196F3",
+          "strokeWidth": 2,
+          "fillColor": "#64B5F6",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          640,
+          490
+        ]
+      },
+      "properties": {
+        "type": "point",
+        "id": "1767599069890-at37gf2ay",
+        "rotation": "0,1",
+        "index": "1",
+        "floor": 1,
+        "connectedPaths": [],
+        "style": {
+          "strokeColor": "#2196F3",
+          "strokeWidth": 2,
+          "fillColor": "#64B5F6",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          210,
+          -180
+        ]
+      },
+      "properties": {
+        "type": "point",
+        "id": "1767599073470-78rg64xwk",
+        "rotation": "0,1",
+        "index": "1",
+        "floor": 1,
+        "connectedPaths": [],
+        "style": {
+          "strokeColor": "#2196F3",
+          "strokeWidth": 2,
+          "fillColor": "#64B5F6",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          100,
+          220
+        ]
+      },
+      "properties": {
+        "type": "text",
+        "id": "1767599598380-t5tk8n9h8",
+        "floor": 1,
+        "text": "主卧",
+        "fontSize": 16,
+        "fontFamily": "Arial",
+        "color": "#333333",
+        "rotation": 0,
+        "alignment": "center",
+        "bold": false,
+        "italic": false,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 1,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          810,
+          180
+        ]
+      },
+      "properties": {
+        "type": "text",
+        "id": "1767599613259-9r55ia74n",
+        "floor": 1,
+        "text": "次卧",
+        "fontSize": 16,
+        "fontFamily": "Arial",
+        "color": "#333333",
+        "rotation": 0,
+        "alignment": "center",
+        "bold": false,
+        "italic": false,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 1,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          710,
+          520
+        ]
+      },
+      "properties": {
+        "type": "text",
+        "id": "1767599621106-asz7qhlw7",
+        "floor": 1,
+        "text": "儿童房",
+        "fontSize": 16,
+        "fontFamily": "Arial",
+        "color": "#333333",
+        "rotation": 0,
+        "alignment": "center",
+        "bold": false,
+        "italic": false,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 1,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          870,
+          -200
+        ]
+      },
+      "properties": {
+        "type": "text",
+        "id": "1767599641133-qx4hjfpvw",
+        "floor": 1,
+        "text": "厨房",
+        "fontSize": 16,
+        "fontFamily": "Arial",
+        "color": "#333333",
+        "rotation": 0,
+        "alignment": "center",
+        "bold": false,
+        "italic": false,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 1,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          440,
+          200
+        ]
+      },
+      "properties": {
+        "type": "text",
+        "id": "1767599679309-2qx5ufd7p",
+        "floor": 1,
+        "text": "客厅",
+        "fontSize": 16,
+        "fontFamily": "Arial",
+        "color": "#333333",
+        "rotation": 0,
+        "alignment": "center",
+        "bold": false,
+        "italic": false,
+        "style": {
+          "strokeColor": "#333333",
+          "strokeWidth": 1,
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1079,
+              59
+            ],
+            [
+              1081,
+              59
+            ],
+            [
+              1081,
+              61
+            ],
+            [
+              1079,
+              61
+            ],
+            [
+              1079,
+              59
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "type": "custom",
+        "id": "1767607465209-fxzbbrswa",
+        "multi_door": "0",
+        "door": "1080,60",
+        "vertex": "",
+        "vertex_id": "",
+        "floor": 1,
+        "poiType": "custom",
+        "style": {
+          "strokeColor": "#FF6B6B",
+          "strokeWidth": 2,
+          "fillColor": "#FFE0E0",
+          "opacity": 1
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120,
+          370
+        ]
+      },
+      "properties": {
+        "type": "window",
+        "id": "1767607664947-j5c6l5blw",
+        "floor": 1,
+        "width": 100,
+        "rotation": 0,
+        "style": {
+          "strokeColor": "#4169E1",
+          "strokeWidth": 2,
+          "fillColor": "#87CEEB",
+          "opacity": 0.8
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          461.6635957657231,
+          369.66944568714064
+        ]
+      },
+      "properties": {
+        "type": "window",
+        "id": "1767607669900-3rpsbvari",
+        "floor": 1,
+        "width": 100,
+        "rotation": 0,
+        "style": {
+          "strokeColor": "#4169E1",
+          "strokeWidth": 2,
+          "fillColor": "#87CEEB",
+          "opacity": 0.8
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          733.3271915314461,
+          629.3388913742809
+        ]
+      },
+      "properties": {
+        "type": "window",
+        "id": "1767607675683-eimg72kn5",
+        "floor": 1,
+        "width": 100,
+        "rotation": 0,
+        "style": {
+          "strokeColor": "#4169E1",
+          "strokeWidth": 2,
+          "fillColor": "#87CEEB",
+          "opacity": 0.8
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          927.7413319602074,
+          539.501576007235
+        ]
+      },
+      "properties": {
+        "type": "window",
+        "id": "1767607677034-rvx17960u",
+        "floor": 1,
+        "width": 100,
+        "rotation": 0,
+        "style": {
+          "strokeColor": "#4169E1",
+          "strokeWidth": 2,
+          "fillColor": "#87CEEB",
+          "opacity": 0.8
+        }
+      }
+    }
+  ]
+}

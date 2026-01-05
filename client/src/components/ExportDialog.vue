@@ -452,7 +452,7 @@ function exportSVG() {
   let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX - padding} ${minY - padding} ${width} ${height}">
   <style>
-    .wall { stroke: #333; stroke-width: 8; stroke-linecap: round; fill: none; }
+    .wall { stroke: #333; stroke-width: 2; stroke-linecap: round; fill: none; }
     .room { stroke: #666; stroke-width: 2; fill: #E8F4F8; fill-opacity: 0.5; }
     .navpath { stroke: #4CAF50; stroke-width: 2; stroke-dasharray: 8,4; fill: none; }
   </style>
@@ -479,16 +479,26 @@ function exportSVG() {
       svgContent += `  <circle cx="${el.position.x}" cy="${el.position.y}" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>\n`
     } else if (el.type === 'door' && 'position' in el) {
       const width = el.width || 90
-      svgContent += `  <rect x="${el.position.x - width/2}" y="${el.position.y - 5}" width="${width}" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>\n`
+      const rotation = el.rotation || 0
+      // Use group with transform for rotation around center
+      svgContent += `  <g transform="translate(${el.position.x}, ${el.position.y}) rotate(${rotation})">\n`
+      svgContent += `    <rect x="${-width/2}" y="-5" width="${width}" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>\n`
+      svgContent += `  </g>\n`
     } else if (el.type === 'window' && 'position' in el) {
       const width = el.width || 100
-      svgContent += `  <rect x="${el.position.x - width/2}" y="${el.position.y - 5}" width="${width}" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>\n`
-      svgContent += `  <line x1="${el.position.x - width/2}" y1="${el.position.y}" x2="${el.position.x + width/2}" y2="${el.position.y}" stroke="#4169E1" stroke-width="1.5"/>\n`
+      const rotation = el.rotation || 0
+      // Use group with transform for rotation around center
+      svgContent += `  <g transform="translate(${el.position.x}, ${el.position.y}) rotate(${rotation})">\n`
+      svgContent += `    <rect x="${-width/2}" y="-5" width="${width}" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>\n`
+      svgContent += `    <line x1="${-width/2}" y1="0" x2="${width/2}" y2="0" stroke="#4169E1" stroke-width="1.5"/>\n`
+      svgContent += `  </g>\n`
     } else if (el.type === 'text' && 'position' in el) {
       const fontSize = el.fontSize || 16
       const color = el.color || '#333333'
       const text = el.text || 'Text'
-      svgContent += `  <text x="${el.position.x}" y="${el.position.y}" font-size="${fontSize}" fill="${color}" text-anchor="middle" dominant-baseline="middle">${text}</text>\n`
+      const rotation = el.rotation || 0
+      // Use transform for text rotation
+      svgContent += `  <text x="${el.position.x}" y="${el.position.y}" font-size="${fontSize}" fill="${color}" text-anchor="middle" dominant-baseline="middle" transform="rotate(${rotation}, ${el.position.x}, ${el.position.y})">${text}</text>\n`
     } else if (el.type === 'poster' && 'position' in el) {
       svgContent += `  <circle cx="${el.position.x}" cy="${el.position.y}" r="6" fill="#FFC107" stroke="#FF9800" stroke-width="2"/>\n`
     }

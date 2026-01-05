@@ -88,18 +88,18 @@ function roomToFeature(room: RoomElement): GeoJSONFeature {
 
 // Convert POI element to GeoJSON feature (Python format compatible)
 function poiToFeature(poi: POIElement): GeoJSONFeature {
-  // Map POI types to Python GeoJSON format
-  let exportType = poi.poiType
+  // Map POI types to Python GeoJSON format (use string type for Python-specific values)
+  let exportType: string = poi.poiType
   switch (poi.poiType) {
     case 'elevator':
       exportType = 'elevator'
       break
     case 'stairs':
-      exportType = 'stair'
+      exportType = 'stair'  // Python format uses 'stair' not 'stairs'
       break
     case 'toilet':
       exportType = poi.gender === 'men' ? 'men_toilet' :
-                   poi.gender === 'women' ? 'women_toilet' : 'toilet'
+        poi.gender === 'women' ? 'women_toilet' : 'toilet'
       break
     // Other types keep original name
     default:
@@ -487,7 +487,8 @@ function featureToElement(feature: GeoJSONFeature): MapElement | null {
   const type = props.type
 
   const baseProps = {
-    id: `imported-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,  // Always generate new ID to avoid collisions
+    // Preserve original ID if available (fixes import reference breakage)
+    id: props.id || `imported-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
     floor: props.floor || 1,
     name: props.name,
     visible: true,

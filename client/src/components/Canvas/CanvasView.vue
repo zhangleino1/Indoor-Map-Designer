@@ -31,8 +31,7 @@ import { ElMessageBox } from 'element-plus'
 import { useEditorStore } from '@/stores/editor'
 import { useElementsStore } from '@/stores/elements'
 import type { Point, MapElement, ToolType } from '@/types'
-import { snapPoint, type SnapOptions } from '@/utils/snap'
-import type { SnapResult } from '@/types'
+import { snapPoint } from '@/utils/snap'
 import {
   distance,
   elementContainsPoint,
@@ -223,6 +222,15 @@ watch([
 ], () => {
   render()
 }, { deep: true })
+
+// Watch for tool changes to clear UI state (fixes High #2)
+watch(currentTool, () => {
+  selectedControlPoint.value = null
+  hoveredControlPoint.value = null
+  currentDimension.value = ''
+  isDraggingControlPoint.value = false
+  controlPointDragStart.value = null
+})
 
 function resizeCanvas() {
   if (!canvasRef.value || !containerRef.value) return

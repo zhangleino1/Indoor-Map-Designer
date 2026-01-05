@@ -64,6 +64,11 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   function setFloor(floor: number) {
+    // Clear drawing state when switching floors (fixes High #3)
+    isDrawing.value = false
+    drawingPoints.value = []
+    hoverPoint.value = null
+
     currentFloor.value = floor
     selectedIds.value = []
   }
