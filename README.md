@@ -1,21 +1,69 @@
 # Indoor Map Designer
 
-A web-based indoor map designer for creating floor plans and exporting GeoJSON for navigation.
+一个基于 Web 的室内地图设计器，用于创建楼层平面图并导出 GeoJSON 格式，支持室内导航和定位应用。
 
-## Features
+## ✨ 核心特性
 
-- **Drawing Tools**: Wall, room, polygon, door, window, POI marker, navigation path
-- **Multi-floor Support**: Manage multiple floors with easy switching
-- **Precise Dimensions**: Real-time dimension display with unit conversion (px/cm/m)
-- **Snap System**: Grid snapping and endpoint snapping for precision
-- **Export Options**: GeoJSON, PNG, SVG export
-- **Undo/Redo**: Full history management
+### 🎨 绘图工具
+- **墙体/线段**：多点绘制，支持 T 型、L 型等复杂墙体
+- **房间/矩形**：拖拽绘制矩形房间
+- **多边形**：自由多边形绘制
+- **门窗**：可调节宽度和旋转角度
+- **兴趣点（POI）**：电梯、楼梯、洗手间、出入口等多种类型
+- **文本标签**：为房间添加文字注释，支持字体、颜色、旋转等样式
+- **导航路径**：绘制导航路线
+- **导航节点**：标记导航关键点
 
-## Tech Stack
+### 🎯 高级编辑功能
+- **控制点编辑**：选中元素后可拖动控制点调整形状
+  - 拖动控制点实时调整墙体、路径形状
+  - 点击控制点 + Delete 删除该点
+  - 选中元素 + Backspace 快速删除最后一个点
+  - 自动吸附网格和端点
+- **多段连续绘图**：无需退出工具即可绘制多个分离的图形段
+- **精确尺寸**：实时显示长度、面积等尺寸信息
+- **多楼层支持**：管理多个楼层，独立编辑
 
-- **Frontend**: Vue 3 + TypeScript + Canvas + Pinia + Element Plus
-- **Backend**: Node.js + Express
-- **Build Tool**: Vite
+### 🧭 导航网络
+- **自动节点关联**：导航路径自动关联起止节点
+- **双向路径支持**：支持单向/双向导航路径
+- **Python 格式兼容**：导出符合 Python 导航库标准的 GeoJSON
+- **显式边格式（v2.0）**：直接导出路径-节点关联关系
+
+### 📤 导出功能
+- **GeoJSON**：支持导出所有元素类型（墙体、房间、门窗、POI、文本、导航网络）
+- **PNG 图片**：支持 1x/2x/4x 高清导出
+- **SVG 矢量图**：可缩放矢量图形导出
+- **3D 预览**：基于 Three.js 的 3D 模型预览
+
+### ⚙️ 精确工具
+- **网格吸附**：对齐到网格
+- **端点吸附**：吸附到其他元素端点
+- **中点吸附**：吸附到线段中点
+- **角度吸附**：固定角度（0°/45°/90°）绘制
+
+### 📋 历史管理
+- **完整撤销/重做**：支持所有操作的撤销重做
+- **批量操作**：支持多选删除、移动等
+- **智能历史**：自动合并批量操作
+
+## 🛠 技术栈
+
+- **前端框架**: Vue 3 + TypeScript
+- **状态管理**: Pinia
+- **UI 库**: Element Plus
+- **图形渲染**: HTML5 Canvas + SVG
+- **3D 渲染**: Three.js
+- **后端**: Node.js + Express
+- **构建工具**: Vite
+
+## 🎬 应用场景
+
+- **室内导航系统**：商场、医院、机场等大型建筑的导航
+- **视觉定位**：配合视觉 SLAM 系统进行室内定位
+- **机器人路径规划**：室内服务机器人的路径规划
+- **应急疏散**：建筑物应急疏散路线设计
+- **空间分析**：室内空间利用率分析
 
 ## Getting Started
 
