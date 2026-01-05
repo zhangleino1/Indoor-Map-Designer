@@ -329,6 +329,9 @@ function drawElement(c: CanvasRenderingContext2D, element: MapElement) {
     case 'poster':
       drawPoster(c, element)
       break
+    case 'text':
+      drawText(c, element)
+      break
     case 'navpath':
       drawNavPath(c, element)
       break
@@ -703,6 +706,58 @@ function drawPoster(c: CanvasRenderingContext2D, element: any) {
     c.textAlign = 'center'
     c.textBaseline = 'top'
     c.fillText(element.name, pos.x, pos.y + size / 2 + 4)
+  }
+
+  c.restore()
+}
+
+// Draw text label
+function drawText(c: CanvasRenderingContext2D, element: any) {
+  const pos = element.position
+  const text = element.text || 'Text'
+  const fontSize = element.fontSize || 16
+  const fontFamily = element.fontFamily || 'Arial'
+  const color = element.color || '#333333'
+  const rotation = element.rotation || 0
+  const alignment = element.alignment || 'center'
+  const bold = element.bold || false
+  const italic = element.italic || false
+
+  c.save()
+
+  // Move to position and rotate
+  c.translate(pos.x, pos.y)
+  c.rotate((rotation * Math.PI) / 180)
+
+  // Set font style
+  let fontStyle = ''
+  if (italic) fontStyle += 'italic '
+  if (bold) fontStyle += 'bold '
+  c.font = `${fontStyle}${fontSize}px ${fontFamily}`
+  c.fillStyle = color
+  c.textAlign = alignment
+  c.textBaseline = 'middle'
+
+  // Draw text
+  c.fillText(text, 0, 0)
+
+  // Draw selection box when hovered/selected
+  if (selectedIds.value.includes(element.id)) {
+    const metrics = c.measureText(text)
+    const textWidth = metrics.width
+    const textHeight = fontSize
+
+    c.strokeStyle = '#409eff'
+    c.lineWidth = 1 / zoom.value // Scale-independent stroke
+    c.setLineDash([5, 3])
+
+    let boxX = 0
+    if (alignment === 'left') boxX = 0
+    else if (alignment === 'center') boxX = -textWidth / 2
+    else if (alignment === 'right') boxX = -textWidth
+
+    c.strokeRect(boxX - 2, -textHeight / 2 - 2, textWidth + 4, textHeight + 4)
+    c.setLineDash([])
   }
 
   c.restore()
@@ -1151,8 +1206,8 @@ function handleMouseDown(e: MouseEvent) {
     // Drawing tools
     const snappedPos = getSnappedPosition(canvasPos)
 
-    // 单击创建的工具类型（POI、导航节点、门、窗户）
-    if (tool === 'poi' || tool === 'navnode' || tool === 'door' || tool === 'window') {
+    // 单击创建的工具类型（POI、导航节点、门、窗户、文本）
+    if (tool === 'poi' || tool === 'navnode' || tool === 'door' || tool === 'window' || tool === 'text') {
       if (tool === 'poi') {
         // Find nearest navigation node for POI association
         const accessNodeId = findNearestNodeForPOI(snappedPos)
@@ -1163,6 +1218,10 @@ function handleMouseDown(e: MouseEvent) {
         elementsStore.createDoor(currentFloor.value, snappedPos)
       } else if (tool === 'window') {
         elementsStore.createWindow(currentFloor.value, snappedPos)
+      } else if (tool === 'text') {
+        // Create text label with default text
+        const textId = elementsStore.createText(currentFloor.value, snappedPos, '房间标签')
+        // TODO: Show text edit dialog to allow user to edit text content
       }
       // 不进入绘制模式，直接创建
       return
@@ -1334,6 +1393,9 @@ function handleKeyDown(e: KeyboardEvent) {
       break
     case 'm':
       switchTool('poi')
+      break
+    case 't':
+      switchTool('text')
       break
     case 'n':
       switchTool('navpath')

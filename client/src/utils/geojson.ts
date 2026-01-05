@@ -6,6 +6,7 @@ import type {
   HallElement,
   POIElement,
   PosterElement,
+  TextElement,
   NavPathElement,
   NavNodeElement,
   Point,
@@ -263,6 +264,32 @@ function posterToFeature(poster: PosterElement): GeoJSONFeature {
   }
 }
 
+// Convert text element to GeoJSON feature
+function textToFeature(text: TextElement): GeoJSONFeature {
+  return {
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: pointToCoords(text.position)
+    },
+    properties: {
+      type: 'text',
+      id: text.id,
+      name: text.name,
+      floor: text.floor,
+      text: text.text,
+      fontSize: text.fontSize || 16,
+      fontFamily: text.fontFamily || 'Arial',
+      color: text.color || '#333333',
+      rotation: text.rotation || 0,
+      alignment: text.alignment || 'center',
+      bold: text.bold || false,
+      italic: text.italic || false,
+      style: text.style
+    }
+  }
+}
+
 // Convert door element to GeoJSON feature
 function doorToFeature(door: any): GeoJSONFeature {
   return {
@@ -343,6 +370,8 @@ export function elementToFeature(element: MapElement): GeoJSONFeature | null {
       return poiToFeature(element as POIElement)
     case 'poster':
       return posterToFeature(element as PosterElement)
+    case 'text':
+      return textToFeature(element as TextElement)
     case 'navpath':
       return navPathToFeature(element as NavPathElement)
     case 'navnode':
@@ -581,6 +610,21 @@ function featureToElement(feature: GeoJSONFeature): MapElement | null {
         vertexId: props.vertex_id
       } as PosterElement
 
+    case 'text':
+      return {
+        ...baseProps,
+        type: 'text',
+        position: coordToPoint(feature.geometry.coordinates as number[]),
+        text: props.text || 'Text',
+        fontSize: props.fontSize || 16,
+        fontFamily: props.fontFamily || 'Arial',
+        color: props.color || '#333333',
+        rotation: props.rotation || 0,
+        alignment: props.alignment || 'center',
+        bold: props.bold || false,
+        italic: props.italic || false
+      } as TextElement
+
     case 'door':
       return {
         ...baseProps,
@@ -657,6 +701,7 @@ function getDefaultStyle(type: string) {
     men_toilet: { strokeColor: '#2196F3', strokeWidth: 2, fillColor: '#BBDEFB', opacity: 0.8 },
     women_toilet: { strokeColor: '#E91E63', strokeWidth: 2, fillColor: '#F8BBD0', opacity: 0.8 },
     poster: { strokeColor: '#FFC107', strokeWidth: 2, fillColor: '#FFECB3', opacity: 1 },
+    text: { strokeColor: '#333333', strokeWidth: 1, fillColor: undefined, opacity: 1 },
     point: { strokeColor: '#4CAF50', strokeWidth: 2, fillColor: '#C8E6C9', opacity: 1 },
     navpath: { strokeColor: '#4CAF50', strokeWidth: 2, opacity: 0.7 },
     navnode: { strokeColor: '#4CAF50', strokeWidth: 2, fillColor: '#C8E6C9', opacity: 1 }

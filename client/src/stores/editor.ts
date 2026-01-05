@@ -33,6 +33,7 @@ export const useEditorStore = defineStore('editor', () => {
     window: true,
     poi: true,
     poster: true,
+    text: true,
     navpath: true,
     navnode: true
   })

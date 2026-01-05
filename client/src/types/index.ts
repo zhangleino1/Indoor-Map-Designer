@@ -20,6 +20,7 @@ export type ToolType =
   | 'door'
   | 'window'
   | 'poi'
+  | 'text'
   | 'corridor'
   | 'hall'
   | 'poster'
@@ -142,6 +143,20 @@ export interface PosterElement extends BaseElement {
   vertexId?: string        // Associated navigation vertex ID
 }
 
+// Text label element for annotations
+export interface TextElement extends BaseElement {
+  type: 'text'
+  position: Point        // Text position (anchor point)
+  text: string          // Text content
+  fontSize?: number     // Font size in pixels (default: 16)
+  fontFamily?: string   // Font family (default: 'Arial')
+  color?: string        // Text color (default: '#333333')
+  rotation?: number     // Rotation angle in degrees (default: 0)
+  alignment?: 'left' | 'center' | 'right'  // Text alignment (default: 'center')
+  bold?: boolean        // Bold text (default: false)
+  italic?: boolean      // Italic text (default: false)
+}
+
 // Navigation path element
 export interface NavPathElement extends BaseElement {
   type: 'navpath'
@@ -173,6 +188,7 @@ export type MapElement =
   | WindowElement
   | POIElement
   | PosterElement
+  | TextElement
   | NavPathElement
   | NavNodeElement
 

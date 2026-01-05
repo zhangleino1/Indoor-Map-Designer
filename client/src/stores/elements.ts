@@ -10,6 +10,7 @@ import type {
   WindowElement,
   POIElement,
   PosterElement,
+  TextElement,
   NavPathElement,
   NavNodeElement,
   Point,
@@ -32,6 +33,7 @@ const defaultStyles: Record<string, ElementStyle> = {
   window: { strokeColor: '#4169E1', strokeWidth: 2, fillColor: '#87CEEB', opacity: 0.8 },
   poi: { strokeColor: '#FF6B6B', strokeWidth: 2, fillColor: '#FFE0E0', opacity: 1 },
   poster: { strokeColor: '#FFC107', strokeWidth: 2, fillColor: '#FFECB3', opacity: 1 },
+  text: { strokeColor: '#333333', strokeWidth: 1, fillColor: undefined, opacity: 1 },
   navpath: { strokeColor: '#4CAF50', strokeWidth: 2, fillColor: undefined, opacity: 0.7 },
   navnode: { strokeColor: '#2196F3', strokeWidth: 2, fillColor: '#64B5F6', opacity: 1 }
 }
@@ -298,6 +300,36 @@ export const useElementsStore = defineStore('elements', () => {
       rotation,
       vertexId
     } as Omit<PosterElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create text label
+  function createText(
+    floor: number,
+    position: Point,
+    text: string = 'Text',
+    options?: {
+      fontSize?: number
+      fontFamily?: string
+      color?: string
+      rotation?: number
+      alignment?: 'left' | 'center' | 'right'
+      bold?: boolean
+      italic?: boolean
+    }
+  ): string {
+    return addElement({
+      type: 'text',
+      floor,
+      position: { ...position },
+      text,
+      fontSize: options?.fontSize || 16,
+      fontFamily: options?.fontFamily || 'Arial',
+      color: options?.color || '#333333',
+      rotation: options?.rotation || 0,
+      alignment: options?.alignment || 'center',
+      bold: options?.bold || false,
+      italic: options?.italic || false
+    } as Omit<TextElement, 'id' | 'visible' | 'locked' | 'style'>)
   }
 
   // Update element
@@ -719,6 +751,7 @@ export const useElementsStore = defineStore('elements', () => {
     createHall,
     createPOI,
     createPoster,
+    createText,
     createNavPath,
     createNavNode,
     createDoor,
