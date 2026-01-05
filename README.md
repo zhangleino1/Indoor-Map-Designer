@@ -67,6 +67,7 @@ npm run build
 | `R` | Room/Rectangle tool |
 | `P` | Polygon tool |
 | `M` | POI marker tool |
+| `T` | Text/Label tool |
 | `O` | Navigation node tool |
 | `N` | Navigation path tool |
 
