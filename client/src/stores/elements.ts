@@ -95,7 +95,7 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Create wall
-  function createWall(floor: number, points: Point[], thickness: number = 5): string {
+  function createWall(floor: number, points: Point[], thickness: number = 1.5): string {
     return addElement({
       type: 'wall',
       floor,

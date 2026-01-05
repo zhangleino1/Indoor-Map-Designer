@@ -2,6 +2,7 @@
   <div
     ref="containerRef"
     class="canvas-wrapper"
+    :style="{ cursor: cursorStyle }"
     @wheel="handleWheel"
     @mousedown="handleMouseDown"
     @mousemove="handleMouseMove"
@@ -82,6 +83,14 @@ const dimensionLabelStyle = computed(() => ({
   left: `${dimensionPos.value.x}px`,
   top: `${dimensionPos.value.y}px`
 }))
+
+// Cursor style based on current tool
+const cursorStyle = computed(() => {
+  if (currentTool.value === 'select') {
+    return 'default'
+  }
+  return 'crosshair'
+})
 
 // Get current floor elements
 const currentElements = computed(() => {
@@ -1629,7 +1638,6 @@ function calculatePathDistance(points: Point[]): number {
 .canvas-wrapper {
   flex: 1;
   overflow: hidden;
-  cursor: crosshair;
   position: relative;
 }
 
