@@ -1676,9 +1676,10 @@ function finishCurrentSegment() {
 
 function findElementAtPoint(point: Point): MapElement | undefined {
   // Search in reverse order (top elements first)
+  // Skip locked elements
   const elements = [...currentElements.value].reverse()
   for (const element of elements) {
-    if (elementContainsPoint(element, point, 10)) {
+    if (!element.locked && elementContainsPoint(element, point, 10)) {
       return element
     }
   }

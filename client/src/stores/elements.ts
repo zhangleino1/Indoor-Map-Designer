@@ -488,22 +488,93 @@ export const useElementsStore = defineStore('elements', () => {
     return `${corridorId}${maxIndex + 1}`
   }
 
-  // Delete multiple elements
+  // Delete multiple elements with cascade cleanup
   function deleteElements(ids: string[]) {
     const deleted: MapElement[] = []
+    const affectedElements: MapElement[] = []
+    const previousStates: MapElement[] = []
+
+    // First, collect elements to delete
     for (const floor in elementsByFloor.value) {
-      elementsByFloor.value[floor] = elementsByFloor.value[floor].filter(el => {
+      for (const el of elementsByFloor.value[floor]) {
         if (ids.includes(el.id)) {
           deleted.push(el)
-          return false
+          previousStates.push({ ...el })
+
+          // Perform cascade cleanup for each element
+          if (el.type === 'navpath') {
+            const navPath = el as NavPathElement
+            // Remove this path from connected nodes
+            if (navPath.startNodeId && !ids.includes(navPath.startNodeId)) {
+              const startNode = getElementById(navPath.startNodeId) as NavNodeElement | undefined
+              if (startNode && startNode.type === 'navnode') {
+                const oldPaths = [...startNode.connectedPaths]
+                const newPaths = startNode.connectedPaths.filter(pid => pid !== el.id)
+                if (oldPaths.length !== newPaths.length) {
+                  if (!affectedElements.some(e => e.id === startNode.id)) {
+                    previousStates.push({ ...startNode })
+                    startNode.connectedPaths = newPaths
+                    affectedElements.push(startNode)
+                  }
+                }
+              }
+            }
+            if (navPath.endNodeId && navPath.endNodeId !== navPath.startNodeId && !ids.includes(navPath.endNodeId)) {
+              const endNode = getElementById(navPath.endNodeId) as NavNodeElement | undefined
+              if (endNode && endNode.type === 'navnode') {
+                const oldPaths = [...endNode.connectedPaths]
+                const newPaths = endNode.connectedPaths.filter(pid => pid !== el.id)
+                if (oldPaths.length !== newPaths.length) {
+                  if (!affectedElements.some(e => e.id === endNode.id)) {
+                    previousStates.push({ ...endNode })
+                    endNode.connectedPaths = newPaths
+                    affectedElements.push(endNode)
+                  }
+                }
+              }
+            }
+          } else if (el.type === 'navnode') {
+            const navNode = el as NavNodeElement
+            // Remove node reference from connected paths
+            navNode.connectedPaths.forEach(pathId => {
+              if (!ids.includes(pathId)) {
+                const path = getElementById(pathId) as NavPathElement | undefined
+                if (path && path.type === 'navpath') {
+                  if (!affectedElements.some(e => e.id === path.id)) {
+                    const oldPath = { ...path }
+                    const updates: Partial<NavPathElement> = {}
+                    if (path.startNodeId === el.id) {
+                      updates.startNodeId = undefined
+                    }
+                    if (path.endNodeId === el.id) {
+                      updates.endNodeId = undefined
+                    }
+                    if (Object.keys(updates).length > 0) {
+                      Object.assign(path, updates)
+                      previousStates.push(oldPath)
+                      affectedElements.push(path)
+                    }
+                  }
+                }
+              }
+            })
+          }
         }
-        return true
-      })
+      }
     }
+
+    // Now delete the elements
+    for (const floor in elementsByFloor.value) {
+      elementsByFloor.value[floor] = elementsByFloor.value[floor].filter(el => !ids.includes(el.id))
+    }
+
+    // Push to history with all affected elements
     if (deleted.length > 0) {
+      const allAffected = [...deleted, ...affectedElements]
       pushHistory({
-        type: 'delete',
-        elements: deleted
+        type: 'batch',
+        elements: allAffected,
+        previousState: previousStates
       })
     }
   }
@@ -613,6 +684,15 @@ export const useElementsStore = defineStore('elements', () => {
           elementsByFloor.value[floor][index] = element
         }
       }
+    } else if (action.type === 'batch' && action.previousState) {
+      // Restore all elements to previous state (for batch operations)
+      for (const element of action.previousState) {
+        const floor = element.floor
+        const index = elementsByFloor.value[floor]?.findIndex(el => el.id === element.id)
+        if (index !== undefined && index !== -1) {
+          elementsByFloor.value[floor][index] = element
+        }
+      }
     }
 
     historyIndex.value--
@@ -643,6 +723,15 @@ export const useElementsStore = defineStore('elements', () => {
       }
     } else if (action.type === 'update') {
       // Apply updates
+      for (const element of action.elements) {
+        const floor = element.floor
+        const index = elementsByFloor.value[floor]?.findIndex(el => el.id === element.id)
+        if (index !== undefined && index !== -1) {
+          elementsByFloor.value[floor][index] = element
+        }
+      }
+    } else if (action.type === 'batch') {
+      // Re-apply batch updates
       for (const element of action.elements) {
         const floor = element.floor
         const index = elementsByFloor.value[floor]?.findIndex(el => el.id === element.id)
