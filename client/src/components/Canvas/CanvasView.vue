@@ -27,6 +27,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { ElMessageBox } from 'element-plus'
 import { useEditorStore } from '@/stores/editor'
 import { useElementsStore } from '@/stores/elements'
 import type { Point, MapElement, ToolType } from '@/types'
@@ -1284,9 +1285,8 @@ function handleMouseDown(e: MouseEvent) {
       } else if (tool === 'window') {
         elementsStore.createWindow(currentFloor.value, snappedPos)
       } else if (tool === 'text') {
-        // Create text label with default text
-        const textId = elementsStore.createText(currentFloor.value, snappedPos, '房间标签')
-        // TODO: Show text edit dialog to allow user to edit text content
+        // Create text label and immediately prompt for content
+        showTextInputDialog(snappedPos)
       }
       // 不进入绘制模式，直接创建
       return
@@ -1437,7 +1437,48 @@ function handleMouseLeave() {
   currentDimension.value = ''
 }
 
-function handleDoubleClick() {
+// Show text input dialog for creating or editing text
+async function showTextInputDialog(position?: Point, existingTextId?: string) {
+  try {
+    const existingElement = existingTextId ? elementsStore.getElementById(existingTextId) : null
+    const defaultValue = existingElement && 'text' in existingElement ? existingElement.text : '房间标签'
+
+    const { value } = await ElMessageBox.prompt('请输入文本内容', '文本标签', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /.+/,
+      inputErrorMessage: '文本内容不能为空',
+      inputValue: defaultValue
+    })
+
+    if (value) {
+      if (existingTextId) {
+        // Edit existing text
+        elementsStore.updateElement(existingTextId, { text: value })
+      } else if (position) {
+        // Create new text
+        elementsStore.createText(currentFloor.value, position, value)
+      }
+    }
+  } catch (error) {
+    // User cancelled, do nothing
+  }
+}
+
+function handleDoubleClick(e: MouseEvent) {
+  // Check if double-clicking on a text element to edit it
+  if (!isDrawing.value) {
+    const rect = containerRef.value!.getBoundingClientRect()
+    const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    const canvasPos = editorStore.screenToCanvas(screenPos)
+    const clickedElement = findElementAtPoint(canvasPos)
+
+    if (clickedElement && clickedElement.type === 'text') {
+      showTextInputDialog(undefined, clickedElement.id)
+      return
+    }
+  }
+
   if (!isDrawing.value) return
 
   finishCurrentSegment()
