@@ -27,7 +27,10 @@ function pointsToCoords(points: Point[]): number[][] {
 }
 
 // Convert wall element to GeoJSON feature
-function wallToFeature(wall: WallElement): GeoJSONFeature {
+function wallToFeature(wall: WallElement, scale: number = 1): GeoJSONFeature {
+  const lengthInPixels = calculateLineLength(wall.points)
+  const lengthInCm = lengthInPixels * scale  // Apply scale factor: pixels × scale = cm
+
   return {
     type: 'Feature',
     geometry: {
@@ -40,7 +43,7 @@ function wallToFeature(wall: WallElement): GeoJSONFeature {
       floor: wall.floor,
       name: wall.name,
       thickness: wall.thickness,
-      length: calculateLineLength(wall.points),
+      length: lengthInCm,  // Length in cm
       style: wall.style
     }
   }
@@ -48,15 +51,8 @@ function wallToFeature(wall: WallElement): GeoJSONFeature {
 
 // Convert room element to GeoJSON feature
 function roomToFeature(room: RoomElement): GeoJSONFeature {
-  // Ensure polygon is closed
-  const coords = pointsToCoords(room.points)
-  if (coords.length > 0) {
-    const first = coords[0]
-    const last = coords[coords.length - 1]
-    if (first[0] !== last[0] || first[1] !== last[1]) {
-      coords.push([...first])
-    }
-  }
+  // Ensure polygon is closed (uses helper function for consistency)
+  const coords = ensureClosedPolygon(pointsToCoords(room.points))
 
   // Python GeoJSON format: door/vertex/vertex_id properties
   const multiDoor = room.doors && room.doors.length > 1 ? '1' : '0'
@@ -168,9 +164,10 @@ function ensureClosedPolygon(coords: number[][]): number[][] {
 }
 
 // Convert navigation path to GeoJSON feature (Explicit edge format for Python)
-function navPathToFeature(navPath: NavPathElement): GeoJSONFeature {
-  // Calculate distance in meters (1px = 1cm, so /100 for meters)
-  const lengthInCm = calculateLineLength(navPath.points)
+function navPathToFeature(navPath: NavPathElement, scale: number = 1): GeoJSONFeature {
+  // Calculate distance correctly: pixels × scale = cm, then / 100 = meters
+  const lengthInPixels = calculateLineLength(navPath.points)
+  const lengthInCm = lengthInPixels * scale  // Apply scale factor
   const distanceInMeters = lengthInCm / 100
 
   return {
@@ -186,7 +183,7 @@ function navPathToFeature(navPath: NavPathElement): GeoJSONFeature {
       start_node: navPath.startNodeId || '',  // Explicit start node ID
       end_node: navPath.endNodeId || '',      // Explicit end node ID
       bidirectional: navPath.bidirectional !== false,
-      distance: distanceInMeters,  // Distance in meters
+      distance: navPath.distance || distanceInMeters,  // Use manual distance if set, else calculated
       weight: navPath.distance || distanceInMeters,  // Allow custom weight
       floor: navPath.floor,
       // Designer-specific properties (for re-import)
@@ -356,10 +353,10 @@ function navNodeToFeature(navNode: NavNodeElement): GeoJSONFeature {
 }
 
 // Convert any element to GeoJSON feature
-export function elementToFeature(element: MapElement): GeoJSONFeature | null {
+export function elementToFeature(element: MapElement, scale: number = 1): GeoJSONFeature | null {
   switch (element.type) {
     case 'wall':
-      return wallToFeature(element as WallElement)
+      return wallToFeature(element as WallElement, scale)
     case 'room':
       return roomToFeature(element as RoomElement)
     case 'corridor':
@@ -373,7 +370,7 @@ export function elementToFeature(element: MapElement): GeoJSONFeature | null {
     case 'text':
       return textToFeature(element as TextElement)
     case 'navpath':
-      return navPathToFeature(element as NavPathElement)
+      return navPathToFeature(element as NavPathElement, scale)
     case 'navnode':
       return navNodeToFeature(element as NavNodeElement)
     case 'door':
@@ -403,7 +400,7 @@ export function exportToGeoJSON(
   for (const floor in elementsByFloor) {
     for (const element of elementsByFloor[floor]) {
       if (element.visible) {
-        const feature = elementToFeature(element)
+        const feature = elementToFeature(element, projectInfo.scale)
         if (feature) {
           features.push(feature)
         }
@@ -413,12 +410,44 @@ export function exportToGeoJSON(
 
   return {
     type: 'FeatureCollection',
+    // Standard GeoJSON CRS declaration for local coordinate systems
+    crs: {
+      type: 'name',
+      properties: {
+        name: 'urn:ogc:def:crs:EPSG::0'  // EPSG:0 indicates local/engineering coordinate system
+      }
+    },
     properties: {
       name: projectInfo.name,
       scale: projectInfo.scale,
       unit: projectInfo.unit,
-      coordinateSystem: options?.coordinateSystem || 'relative',
-      origin: options?.origin || 'canvas_topleft',
+      // Detailed coordinate system metadata for positioning systems
+      coordinateSystem: {
+        type: options?.coordinateSystem || 'local',  // Changed from 'relative' to 'local' (standard term)
+        origin: {
+          x: 0,
+          y: 0,
+          description: options?.origin || 'canvas_topleft',
+          reference: 'Top-left corner of canvas at (0, 0)'
+        },
+        axes: {
+          x: {
+            direction: 'right',
+            unit: projectInfo.unit || 'cm',
+            description: 'X-axis points to the right (East)'
+          },
+          y: {
+            direction: 'down',
+            unit: projectInfo.unit || 'cm',
+            description: 'Y-axis points downward (South) - canvas coordinate system'
+          }
+        },
+        // Note: Coordinates are stored in pixels, where 1 pixel = scale * 1cm
+        // To convert to real-world units: real_value_cm = pixel_value * scale
+        storageUnit: 'pixels',
+        conversionFactor: projectInfo.scale,
+        conversionFormula: `real_${projectInfo.unit} = pixel_value × ${projectInfo.scale}`
+      },
       format_version: '2.0',  // Mark as new explicit edge format
       edge_type: 'explicit'   // Indicate explicit edges (not implicit)
     },
@@ -442,17 +471,47 @@ export function exportFloorToGeoJSON(
 ): GeoJSONCollection {
   const features: GeoJSONFeature[] = elements
     .filter(el => el.visible)
-    .map(el => elementToFeature(el))
+    .map(el => elementToFeature(el, projectInfo.scale))
     .filter((f): f is GeoJSONFeature => f !== null)
 
   return {
     type: 'FeatureCollection',
+    // Standard GeoJSON CRS declaration for local coordinate systems
+    crs: {
+      type: 'name',
+      properties: {
+        name: 'urn:ogc:def:crs:EPSG::0'  // EPSG:0 indicates local/engineering coordinate system
+      }
+    },
     properties: {
       name: `${projectInfo.name} - ${floor.name}`,
       scale: projectInfo.scale,
       unit: projectInfo.unit,
-      coordinateSystem: options?.coordinateSystem || 'relative',
-      origin: options?.origin || 'canvas_topleft',
+      // Detailed coordinate system metadata for positioning systems
+      coordinateSystem: {
+        type: options?.coordinateSystem || 'local',
+        origin: {
+          x: 0,
+          y: 0,
+          description: options?.origin || 'canvas_topleft',
+          reference: 'Top-left corner of canvas at (0, 0)'
+        },
+        axes: {
+          x: {
+            direction: 'right',
+            unit: projectInfo.unit || 'cm',
+            description: 'X-axis points to the right (East)'
+          },
+          y: {
+            direction: 'down',
+            unit: projectInfo.unit || 'cm',
+            description: 'Y-axis points downward (South) - canvas coordinate system'
+          }
+        },
+        storageUnit: 'pixels',
+        conversionFactor: projectInfo.scale,
+        conversionFormula: `real_${projectInfo.unit} = pixel_value × ${projectInfo.scale}`
+      },
       format_version: '2.0',
       edge_type: 'explicit',
       floor: floor.id,

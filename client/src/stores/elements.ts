@@ -9,6 +9,7 @@ import type {
   DoorElement,
   WindowElement,
   POIElement,
+  POIType,
   PosterElement,
   TextElement,
   NavPathElement,
@@ -124,13 +125,13 @@ export const useElementsStore = defineStore('elements', () => {
     } as Omit<RoomElement, 'id' | 'visible' | 'locked' | 'style'>)
   }
 
-  // Create POI
-  function createPOI(floor: number, position: Point, poiType: string = 'custom', name?: string, accessNodeId?: string): string {
+  // Create POI with strict type validation
+  function createPOI(floor: number, position: Point, poiType: POIType = 'custom', name?: string, accessNodeId?: string): string {
     return addElement({
       type: 'poi',
       floor,
       position: { ...position },
-      poiType,
+      poiType,  // Now typed as POIType, preventing invalid values
       name,
       accessNodeId
     } as unknown as Omit<POIElement, 'id' | 'visible' | 'locked' | 'style'>)
@@ -770,26 +771,83 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Import multiple elements (supports undo as a single action)
-  function importElements(elements: Array<Omit<MapElement, 'id' | 'visible' | 'locked' | 'style'> & Partial<Pick<MapElement, 'style'>>>) {
+  // Now preserves IDs to maintain navigation graph references
+  function importElements(elements: Array<Partial<Pick<MapElement, 'id'>> & Omit<MapElement, 'id' | 'visible' | 'locked' | 'style'> & Partial<Pick<MapElement, 'style'>>>) {
     const importedElements: MapElement[] = []
+    const idMapping = new Map<string, string>() // Track old ID -> new ID for reference updates
 
+    // First pass: Import all elements and build ID mapping
     for (const element of elements) {
       const floor = element.floor
       if (!elementsByFloor.value[floor]) {
         elementsByFloor.value[floor] = []
       }
 
-      const newElement: MapElement = {
-        ...element,
-        id: generateId(),
-        visible: true,
-        locked: false,
-        style: element.style || { ...defaultStyles[element.type] }
-      } as MapElement
+      // Preserve original ID if provided, otherwise generate new one
+      const originalId = 'id' in element ? element.id : undefined
+      const finalId = originalId || generateId()
 
-      elementsByFloor.value[floor].push(newElement)
-      importedElements.push(newElement)
+      // Check for ID conflicts
+      const existingElement = getElementById(finalId)
+      if (existingElement && originalId) {
+        // ID conflict - generate new ID and track mapping
+        const newId = generateId()
+        idMapping.set(originalId, newId)
+
+        const newElement: MapElement = {
+          ...element,
+          id: newId,
+          visible: true,
+          locked: false,
+          style: element.style || { ...defaultStyles[element.type] }
+        } as MapElement
+
+        elementsByFloor.value[floor].push(newElement)
+        importedElements.push(newElement)
+      } else {
+        // No conflict - use original or new ID
+        const newElement: MapElement = {
+          ...element,
+          id: finalId,
+          visible: true,
+          locked: false,
+          style: element.style || { ...defaultStyles[element.type] }
+        } as MapElement
+
+        elementsByFloor.value[floor].push(newElement)
+        importedElements.push(newElement)
+      }
     }
+
+    // Second pass: Update all references if there were ID conflicts
+    if (idMapping.size > 0) {
+      for (const element of importedElements) {
+        if (element.type === 'navpath') {
+          const navPath = element as NavPathElement
+          if (navPath.startNodeId && idMapping.has(navPath.startNodeId)) {
+            navPath.startNodeId = idMapping.get(navPath.startNodeId)
+          }
+          if (navPath.endNodeId && idMapping.has(navPath.endNodeId)) {
+            navPath.endNodeId = idMapping.get(navPath.endNodeId)
+          }
+        } else if (element.type === 'navnode') {
+          const navNode = element as NavNodeElement
+          if (navNode.connectedPaths && navNode.connectedPaths.length > 0) {
+            navNode.connectedPaths = navNode.connectedPaths.map(pathId =>
+              idMapping.get(pathId) || pathId
+            )
+          }
+        } else if (element.type === 'poi') {
+          const poi = element as POIElement
+          if (poi.accessNodeId && idMapping.has(poi.accessNodeId)) {
+            poi.accessNodeId = idMapping.get(poi.accessNodeId)
+          }
+        }
+      }
+    }
+
+    // Third pass: Reconstruct navigation graph to ensure consistency
+    reconstructNavigationGraph(importedElements)
 
     // Add all imported elements as a single history action
     if (importedElements.length > 0) {
@@ -800,6 +858,73 @@ export const useElementsStore = defineStore('elements', () => {
     }
 
     return importedElements.length
+  }
+
+  // Helper function: Reconstruct navigation graph after import
+  function reconstructNavigationGraph(elements: MapElement[]) {
+    const nodes = new Map<string, NavNodeElement>()
+    const paths: NavPathElement[] = []
+
+    // Collect nodes and paths from imported elements
+    for (const el of elements) {
+      if (el.type === 'navnode') {
+        nodes.set(el.id, el as NavNodeElement)
+      } else if (el.type === 'navpath') {
+        paths.push(el as NavPathElement)
+      }
+    }
+
+    // Clear connectedPaths for all imported nodes
+    nodes.forEach(node => {
+      node.connectedPaths = []
+    })
+
+    // Rebuild connectedPaths from paths
+    for (const path of paths) {
+      if (path.startNodeId && nodes.has(path.startNodeId)) {
+        const startNode = nodes.get(path.startNodeId)!
+        if (!startNode.connectedPaths.includes(path.id)) {
+          startNode.connectedPaths.push(path.id)
+        }
+      }
+      if (path.endNodeId && nodes.has(path.endNodeId)) {
+        const endNode = nodes.get(path.endNodeId)!
+        if (!endNode.connectedPaths.includes(path.id)) {
+          endNode.connectedPaths.push(path.id)
+        }
+      }
+    }
+
+    // Also check for existing nodes in the store that might reference imported paths
+    for (const floor in elementsByFloor.value) {
+      for (const el of elementsByFloor.value[floor]) {
+        if (el.type === 'navnode' && !nodes.has(el.id)) {
+          const navNode = el as NavNodeElement
+          // Check if this existing node references any newly imported paths
+          for (const path of paths) {
+            if ((path.startNodeId === navNode.id || path.endNodeId === navNode.id) &&
+                !navNode.connectedPaths.includes(path.id)) {
+              navNode.connectedPaths.push(path.id)
+            }
+          }
+        } else if (el.type === 'navpath' && !paths.some(p => p.id === el.id)) {
+          const navPath = el as NavPathElement
+          // Check if this existing path references any newly imported nodes
+          if (navPath.startNodeId && nodes.has(navPath.startNodeId)) {
+            const startNode = nodes.get(navPath.startNodeId)!
+            if (!startNode.connectedPaths.includes(navPath.id)) {
+              startNode.connectedPaths.push(navPath.id)
+            }
+          }
+          if (navPath.endNodeId && nodes.has(navPath.endNodeId)) {
+            const endNode = nodes.get(navPath.endNodeId)!
+            if (!endNode.connectedPaths.includes(navPath.id)) {
+              endNode.connectedPaths.push(navPath.id)
+            }
+          }
+        }
+      }
+    }
   }
 
   // Copy elements from one floor to another
