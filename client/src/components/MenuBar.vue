@@ -29,6 +29,10 @@
 
       <el-checkbox v-model="showGrid" @change="toggleGrid">网格</el-checkbox>
       <el-checkbox v-model="snapToGrid" @change="toggleSnap">吸附</el-checkbox>
+
+      <el-divider direction="vertical" />
+
+      <el-button type="primary" @click="open3DPreviewWindow">🏠 3D预览</el-button>
     </div>
 
     <div class="menu-right">
@@ -76,13 +80,17 @@ import {
 import { ElMessage } from 'element-plus'
 import { useEditorStore } from '@/stores/editor'
 import { useElementsStore } from '@/stores/elements'
+import { useFloorsStore } from '@/stores/floors'
+import { exportToGeoJSON } from '@/utils/geojson'
+import { open3DPreview } from '@/utils/preview3d'
 
 defineEmits(['export', 'import', 'showHelp'])
 
 const editorStore = useEditorStore()
 const elementsStore = useElementsStore()
+const floorsStore = useFloorsStore()
 
-const { zoom, showGrid, snapToGrid, unit } = storeToRefs(editorStore)
+const { zoom, showGrid, snapToGrid, unit, scale } = storeToRefs(editorStore)
 const { canUndo, canRedo } = storeToRefs(elementsStore)
 
 function zoomIn() {
@@ -119,6 +127,29 @@ function clearCache() {
     ElMessage.success('缓存已清除')
   } catch (e) {
     ElMessage.error('清除缓存失败')
+  }
+}
+
+function open3DPreviewWindow() {
+  try {
+    // Get all elements by floor for export
+    const elementsByFloor: Record<number, any[]> = {}
+    for (const floor of floorsStore.floors) {
+      elementsByFloor[floor.id] = elementsStore.getElementsByFloor(floor.id)
+    }
+    
+    // Export to GeoJSON format
+    const geojson = exportToGeoJSON(elementsByFloor, {
+      name: '室内地图',
+      scale: scale.value,
+      unit: unit.value
+    })
+    
+    // Open 3D preview in new window
+    open3DPreview(geojson)
+  } catch (e) {
+    console.error('3D preview error:', e)
+    ElMessage.error('生成3D预览失败')
   }
 }
 </script>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1230" height="1040.5429545079332" viewBox="-50 -341.2040631336522 1230 1040.5429545079332">
+  <style>
+    .wall { stroke: #333; stroke-width: 2; stroke-linecap: round; fill: none; }
+    .room { stroke: #666; stroke-width: 2; fill: #E8F4F8; fill-opacity: 0.5; }
+    .navpath { stroke: #4CAF50; stroke-width: 2; stroke-dasharray: 8,4; fill: none; }
+  </style>
+  <path class="room" d="M0,0 L320,0 L320,370 L0,370 L0,0 Z"/>
+  <path class="wall" d="M161.2040631336522,-1.2040631336522267 L161.2040631336522,-181.20406313365223 L321.2040631336522,-181.20406313365223 L321.2040631336522,-231.20406313365223 L501.2040631336522,-231.20406313365223 L501.2040631336522,-181.20406313365223 L671.2040631336522,-181.20406313365223 L671.2040631336522,-291.2040631336522 L1130,-290"/>
+  <path class="wall" d="M671.2040631336522,-181.20406313365223 L670,-70"/>
+  <path class="wall" d="M1130,-290 L1130,-70 L990,-70"/>
+  <path class="wall" d="M990,-70 L670,-70"/>
+  <g transform="translate(714.7966131045373, -68.83050870034903) rotate(0)">
+    <rect x="-45" y="-5" width="90" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>
+  </g>
+  <path class="wall" d="M670,80 L990,80"/>
+  <path class="room" d="M603.3271915314461,369.33889137428133 L863.3271915314461,369.33889137428133 L863.3271915314461,629.3388913742809 L603.3271915314461,629.3388913742809 L603.3271915314461,369.33889137428133 Z"/>
+  <path class="wall" d="M670,80 L670,370"/>
+  <path class="wall" d="M992.7413319602074,79.50157600723503 L992.7413319602074,539.501576007235 L862.7413319602074,539.501576007235"/>
+  <path class="wall" d="M990,80 L990,-70"/>
+  <g transform="translate(990, 5) rotate(90)">
+    <rect x="-50" y="-5" width="100" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>
+    <line x1="-50" y1="0" x2="50" y2="0" stroke="#4169E1" stroke-width="1.5"/>
+  </g>
+  <path class="wall" d="M770,-70 L770,80"/>
+  <g transform="translate(771.9732788285622, -4.866394142811044) rotate(90)">
+    <rect x="-45" y="-5" width="90" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>
+  </g>
+  <path class="wall" d="M320,370 L603.3271915314461,369.33889137428133"/>
+  <g transform="translate(670, 310) rotate(90)">
+    <rect x="-45" y="-5" width="90" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>
+  </g>
+  <g transform="translate(650.3363327271752, 370.0492602249786) rotate(180)">
+    <rect x="-45" y="-5" width="90" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>
+  </g>
+  <circle cx="910" cy="0" r="8" fill="#FF6B6B"/>
+  <g transform="translate(210, -180) rotate(0)">
+    <rect x="-45" y="-5" width="90" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>
+  </g>
+  <path class="navpath" d="M210,-180 L210,-30 L490,-30 L500,330 L820,320"/>
+  <path class="navpath" d="M644.1957321229802,330 L654.1957321229802,490"/>
+  <path class="navpath" d="M490,10 L910,0"/>
+  <path class="navpath" d="M700,5 L730,-190"/>
+  <g transform="translate(319.5871963689406, 52.58719636894067) rotate(270)">
+    <rect x="-45" y="-5" width="90" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>
+  </g>
+  <path class="navpath" d="M490,70 L140,80"/>
+  <circle cx="730" cy="-190" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>
+  <circle cx="910" cy="0" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>
+  <circle cx="140" cy="80" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>
+  <circle cx="820" cy="320" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>
+  <circle cx="640" cy="490" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>
+  <circle cx="210" cy="-180" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>
+  <text x="100" y="220" font-size="16" fill="#333333" text-anchor="middle" dominant-baseline="middle" transform="rotate(0, 100, 220)">主卧</text>
+  <text x="810" y="180" font-size="16" fill="#333333" text-anchor="middle" dominant-baseline="middle" transform="rotate(0, 810, 180)">次卧</text>
+  <text x="710" y="520" font-size="16" fill="#333333" text-anchor="middle" dominant-baseline="middle" transform="rotate(0, 710, 520)">儿童房</text>
+  <text x="870" y="-200" font-size="16" fill="#333333" text-anchor="middle" dominant-baseline="middle" transform="rotate(0, 870, -200)">厨房</text>
+  <text x="440" y="200" font-size="16" fill="#333333" text-anchor="middle" dominant-baseline="middle" transform="rotate(0, 440, 200)">客厅</text>
+  <circle cx="1080" cy="60" r="8" fill="#FF6B6B"/>
+  <g transform="translate(120, 370) rotate(0)">
+    <rect x="-50" y="-5" width="100" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>
+    <line x1="-50" y1="0" x2="50" y2="0" stroke="#4169E1" stroke-width="1.5"/>
+  </g>
+  <g transform="translate(461.6635957657231, 369.66944568714064) rotate(0)">
+    <rect x="-50" y="-5" width="100" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>
+    <line x1="-50" y1="0" x2="50" y2="0" stroke="#4169E1" stroke-width="1.5"/>
+  </g>
+  <g transform="translate(733.3271915314461, 629.3388913742809) rotate(0)">
+    <rect x="-50" y="-5" width="100" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>
+    <line x1="-50" y1="0" x2="50" y2="0" stroke="#4169E1" stroke-width="1.5"/>
+  </g>
+  <g transform="translate(927.7413319602074, 539.501576007235) rotate(0)">
+    <rect x="-50" y="-5" width="100" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>
+    <line x1="-50" y1="0" x2="50" y2="0" stroke="#4169E1" stroke-width="1.5"/>
+  </g>
+</svg>

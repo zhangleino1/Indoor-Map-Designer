@@ -27,9 +27,13 @@ export const useEditorStore = defineStore('editor', () => {
   const layerVisibility = ref<Record<string, boolean>>({
     wall: true,
     room: true,
+    corridor: true,
+    hall: true,
     door: true,
     window: true,
     poi: true,
+    poster: true,
+    text: true,
     navpath: true,
     navnode: true
   })
@@ -60,6 +64,11 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   function setFloor(floor: number) {
+    // Clear drawing state when switching floors (fixes High #3)
+    isDrawing.value = false
+    drawingPoints.value = []
+    hoverPoint.value = null
+
     currentFloor.value = floor
     selectedIds.value = []
   }

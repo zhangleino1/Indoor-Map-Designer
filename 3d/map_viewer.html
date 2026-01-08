@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>室内3D地图</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      overflow: hidden;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      max-width: 280px;
+      backdrop-filter: blur(10px);
+    }
+
+    #info-panel h2 {
+      color: #1a1a2e;
+      margin-bottom: 15px;
+      font-size: 1.3em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #info-panel h2::before {
+      content: '🏠';
+    }
+
+    .control-group {
+      margin-bottom: 15px;
+    }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #444;
+      font-weight: 500;
+      font-size: 0.9em;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+
+    .btn-secondary.active {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      color: white;
+    }
+
+    #room-info {
+      padding: 12px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      border-radius: 10px;
+      font-size: 0.9em;
+      color: #555;
+      min-height: 60px;
+    }
+
+    #room-info strong {
+      color: #1a1a2e;
+    }
+
+    .legend {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 0.85em;
+      color: #666;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    #loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #loading-text {
+      color: white;
+      font-size: 1.1em;
+    }
+
+    .tooltip {
+      position: absolute;
+      background: rgba(26, 26, 46, 0.95);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 0.9em;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 100;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .tooltip.visible {
+      opacity: 1;
+    }
+
+    #controls-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      color: #666;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-text">加载3D室内地图...</div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <div id="info-panel">
+    <h2>室内3D地图</h2>
+
+    <div class="control-group">
+      <label>视角控制</label>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="resetCamera()">重置视角</button>
+        <button class="btn btn-secondary" onclick="setTopView()">俯视图</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>显示选项</label>
+      <div class="btn-group">
+        <button class="btn btn-secondary active" id="btn-walls" onclick="toggleWalls()">墙壁</button>
+        <button class="btn btn-secondary active" id="btn-nav" onclick="toggleNavPath()">导航路径</button>
+        <button class="btn btn-secondary active" id="btn-labels" onclick="toggleLabels()">标签</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>房间信息</label>
+      <div id="room-info">
+        将鼠标悬停在房间上查看详情
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color" style="background: #E8F4F8; border: 1px solid #666;"></div>
+        <span>房间区域</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #333;"></div>
+        <span>墙壁</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #DEB887;"></div>
+        <span>门</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #87CEEB;"></div>
+        <span>窗户</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #4CAF50;"></div>
+        <span>导航路径</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <div id="controls-hint">
+    🖱️ 左键拖动旋转 | 滚轮缩放 | 右键拖动平移
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    // GeoJSON数据
+    const geoJsonData = {
+      "type": "FeatureCollection",
+      "properties": {
+        "name": "室内地图",
+        "scale": 1,
+        "unit": "m"
+      },
+      "features": [
+        // 主卧房间
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[0, 0], [320, 0], [320, 370], [0, 370], [0, 0]]]
+          },
+          "properties": {
+            "type": "room",
+            "id": "main-bedroom",
+            "name": "主卧",
+            "floor": 1,
+            "area": 118400
+          }
+        },
+        // 儿童房
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[600.87, 373.54], [860.87, 373.54], [860.87, 633.54], [600.87, 633.54], [600.87, 373.54]]]
+          },
+          "properties": {
+            "type": "room",
+            "id": "kids-room",
+            "name": "儿童房",
+            "floor": 1,
+            "area": 67600
+          }
+        },
+        // 次卧
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[670, -70], [990, -70], [990, 80], [670, 80], [670, -70]]]
+          },
+          "properties": {
+            "type": "room",
+            "id": "second-bedroom",
+            "name": "次卧",
+            "floor": 1,
+            "area": 48000
+          }
+        },
+        // 厨房
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[671.2, -181.2], [1130, -181.2], [1130, -290], [671.2, -290], [671.2, -181.2]]]
+          },
+          "properties": {
+            "type": "room",
+            "id": "kitchen",
+            "name": "厨房",
+            "floor": 1,
+            "area": 50000
+          }
+        },
+        // 客厅（中央区域）
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [[[320, 0], [670, 0], [670, 370], [320, 370], [320, 0]]]
+          },
+          "properties": {
+            "type": "room",
+            "id": "living-room",
+            "name": "客厅",
+            "floor": 1,
+            "area": 129500
+          }
+        },
+        // 墙壁
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [[161.2, -1.2], [161.2, -181.2], [321.2, -181.2], [321.2, -231.2], [501.2, -231.2], [501.2, -181.2], [671.2, -181.2], [671.2, -291.2], [1130, -290]]
+          },
+          "properties": { "type": "wall", "thickness": 8 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[671.2, -181.2], [670, -70]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[1130, -290], [1130, -70], [990, -70]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[990, -70], [670, -70]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[670, 80], [990, 80]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[670, 80], [670, 370]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[990, 80], [990, 540], [860, 540]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[990, 80], [990, -70]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[770, -70], [770, 80]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[320, 370], [600.87, 369]] },
+          "properties": { "type": "wall", "thickness": 6 }
+        },
+        // 门
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [714.8, -68.8] },
+          "properties": { "type": "door", "width": 90, "rotation": 0 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [772, -4.9] },
+          "properties": { "type": "door", "width": 90, "rotation": 90 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [670, 310] },
+          "properties": { "type": "door", "width": 90, "rotation": 90 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [604, 420] },
+          "properties": { "type": "door", "width": 90, "rotation": 90 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [210, -180] },
+          "properties": { "type": "door", "width": 90, "rotation": 0 }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [277, 10] },
+          "properties": { "type": "door", "width": 90, "rotation": 180 }
+        },
+        // 窗户
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [990, 5] },
+          "properties": { "type": "window", "width": 100, "rotation": 90 }
+        },
+        // 导航路径
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[210, -180], [210, -30], [490, -30], [500, 330], [820, 320]] },
+          "properties": { "type": "edge" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[630, 330], [640, 490]] },
+          "properties": { "type": "edge" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[490, 10], [910, 0]] },
+          "properties": { "type": "edge" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[700, 5], [730, -190]] },
+          "properties": { "type": "edge" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "LineString", "coordinates": [[490, 70], [140, 80]] },
+          "properties": { "type": "edge" }
+        },
+        // 导航点
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [730, -190] },
+          "properties": { "type": "point" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [910, 0] },
+          "properties": { "type": "point" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [140, 80] },
+          "properties": { "type": "point" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [820, 320] },
+          "properties": { "type": "point" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [640, 490] },
+          "properties": { "type": "point" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [210, -180] },
+          "properties": { "type": "point" }
+        },
+        // 房间标签
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [100, 220] },
+          "properties": { "type": "text", "text": "主卧" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [810, 180] },
+          "properties": { "type": "text", "text": "次卧" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [710, 520] },
+          "properties": { "type": "text", "text": "儿童房" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [870, -200] },
+          "properties": { "type": "text", "text": "厨房" }
+        },
+        {
+          "type": "Feature",
+          "geometry": { "type": "Point", "coordinates": [440, 200] },
+          "properties": { "type": "text", "text": "客厅" }
+        }
+      ]
+    };
+
+    // Three.js变量
+    let scene, camera, renderer, controls;
+    let wallsGroup, navPathGroup, labelsGroup;
+    let roomMeshes = [];
+    const scale = 0.01; // 缩放因子
+    const wallHeight = 2.5; // 墙壁高度
+    const floorY = 0;
+
+    // 颜色配置
+    const colors = {
+      floor: 0xE8F4F8,
+      wall: 0x555555,
+      wallTop: 0x666666,
+      door: 0xDEB887,
+      doorFrame: 0x8B4513,
+      window: 0x87CEEB,
+      windowFrame: 0x4169E1,
+      navPath: 0x4CAF50,
+      navPoint: 0x2196F3,
+      ambient: 0xffffff,
+      directional: 0xffffff,
+      ground: 0x2d2d3a
+    };
+
+    // 房间颜色配置
+    const roomColors = {
+      '主卧': 0xFFE4E1,
+      '次卧': 0xE0FFFF,
+      '儿童房': 0xFFF8DC,
+      '厨房': 0xF0FFF0,
+      '客厅': 0xFFF0F5
+    };
+
+    function init() {
+      // 场景
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a2e);
+      scene.fog = new THREE.Fog(0x1a1a2e, 20, 50);
+
+      // 相机
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(8, 10, 12);
+      camera.lookAt(5, 0, 2);
+
+      // 渲染器
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+      // 控制器
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2.1;
+      controls.minDistance = 3;
+      controls.maxDistance = 30;
+      controls.target.set(5, 0, 2);
+
+      // 光照
+      setupLights();
+
+      // 创建组
+      wallsGroup = new THREE.Group();
+      navPathGroup = new THREE.Group();
+      labelsGroup = new THREE.Group();
+      scene.add(wallsGroup);
+      scene.add(navPathGroup);
+      scene.add(labelsGroup);
+
+      // 创建地面
+      createGround();
+
+      // 解析GeoJSON并创建3D对象
+      parseGeoJSON();
+
+      // 事件监听
+      window.addEventListener('resize', onWindowResize);
+      renderer.domElement.addEventListener('mousemove', onMouseMove);
+
+      // 隐藏加载界面
+      setTimeout(() => {
+        document.getElementById('loading').style.display = 'none';
+      }, 500);
+
+      animate();
+    }
+
+    function setupLights() {
+      // 环境光
+      const ambientLight = new THREE.AmbientLight(colors.ambient, 0.4);
+      scene.add(ambientLight);
+
+      // 主方向光
+      const directionalLight = new THREE.DirectionalLight(colors.directional, 0.8);
+      directionalLight.position.set(10, 20, 10);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 2048;
+      directionalLight.shadow.mapSize.height = 2048;
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 50;
+      directionalLight.shadow.camera.left = -20;
+      directionalLight.shadow.camera.right = 20;
+      directionalLight.shadow.camera.top = 20;
+      directionalLight.shadow.camera.bottom = -20;
+      scene.add(directionalLight);
+
+      // 补光
+      const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+      fillLight.position.set(-5, 10, -5);
+      scene.add(fillLight);
+
+      // 半球光
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+      scene.add(hemiLight);
+    }
+
+    function createGround() {
+      // 大地面
+      const groundGeometry = new THREE.PlaneGeometry(100, 100);
+      const groundMaterial = new THREE.MeshStandardMaterial({
+        color: colors.ground,
+        roughness: 0.9
+      });
+      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.01;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // 网格辅助线
+      const gridHelper = new THREE.GridHelper(50, 50, 0x444466, 0x333355);
+      gridHelper.position.y = -0.005;
+      scene.add(gridHelper);
+    }
+
+    function parseGeoJSON() {
+      const features = geoJsonData.features;
+
+      features.forEach(feature => {
+        const props = feature.properties;
+        const geom = feature.geometry;
+
+        switch (props.type) {
+          case 'room':
+            createRoom(geom.coordinates[0], props);
+            break;
+          case 'wall':
+            createWall(geom.coordinates, props.thickness || 6);
+            break;
+          case 'door':
+            createDoor(geom.coordinates, props);
+            break;
+          case 'window':
+            createWindow(geom.coordinates, props);
+            break;
+          case 'edge':
+            createNavPath(geom.coordinates);
+            break;
+          case 'point':
+            createNavPoint(geom.coordinates);
+            break;
+          case 'text':
+            createLabel(geom.coordinates, props.text);
+            break;
+        }
+      });
+    }
+
+    function createRoom(coordinates, props) {
+      const shape = new THREE.Shape();
+
+      coordinates.forEach((coord, i) => {
+        const x = coord[0] * scale;
+        const z = coord[1] * scale;
+        if (i === 0) {
+          shape.moveTo(x, z);
+        } else {
+          shape.lineTo(x, z);
+        }
+      });
+
+      // 地板
+      const floorGeometry = new THREE.ShapeGeometry(shape);
+      const roomColor = roomColors[props.name] || colors.floor;
+      const floorMaterial = new THREE.MeshStandardMaterial({
+        color: roomColor,
+        roughness: 0.8,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+      });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = floorY + 0.01;
+      floor.receiveShadow = true;
+      floor.userData = {
+        type: 'room',
+        name: props.name || '房间',
+        area: props.area ? (props.area / 10000).toFixed(1) : '未知'
+      };
+      roomMeshes.push(floor);
+      scene.add(floor);
+
+      // 房间边框
+      const edgeGeometry = new THREE.EdgesGeometry(floorGeometry);
+      const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x666666, linewidth: 2 });
+      const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+      edges.rotation.x = -Math.PI / 2;
+      edges.position.y = floorY + 0.02;
+      scene.add(edges);
+    }
+
+    function createWall(coordinates, thickness) {
+      const wallThickness = thickness * scale * 0.8;
+
+      for (let i = 0; i < coordinates.length - 1; i++) {
+        const start = coordinates[i];
+        const end = coordinates[i + 1];
+
+        const x1 = start[0] * scale;
+        const z1 = start[1] * scale;
+        const x2 = end[0] * scale;
+        const z2 = end[1] * scale;
+
+        const length = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
+        const angle = Math.atan2(z2 - z1, x2 - x1);
+
+        // 墙壁主体
+        const wallGeometry = new THREE.BoxGeometry(length, wallHeight, wallThickness);
+        const wallMaterial = new THREE.MeshStandardMaterial({
+          color: colors.wall,
+          roughness: 0.7,
+          metalness: 0.1
+        });
+        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+
+        wall.position.set(
+          (x1 + x2) / 2,
+          wallHeight / 2,
+          (z1 + z2) / 2
+        );
+        wall.rotation.y = -angle;
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+
+        wallsGroup.add(wall);
+
+        // 墙顶装饰
+        const topGeometry = new THREE.BoxGeometry(length + 0.02, 0.05, wallThickness + 0.02);
+        const topMaterial = new THREE.MeshStandardMaterial({
+          color: colors.wallTop,
+          roughness: 0.5
+        });
+        const top = new THREE.Mesh(topGeometry, topMaterial);
+        top.position.set(
+          (x1 + x2) / 2,
+          wallHeight,
+          (z1 + z2) / 2
+        );
+        top.rotation.y = -angle;
+        top.castShadow = true;
+        wallsGroup.add(top);
+      }
+    }
+
+    function createDoor(coordinates, props) {
+      const x = coordinates[0] * scale;
+      const z = coordinates[1] * scale;
+      const width = (props.width || 90) * scale;
+      const height = 2.1;
+      const depth = 0.08;
+      const rotation = (props.rotation || 0) * Math.PI / 180;
+
+      // 门框
+      const frameGeometry = new THREE.BoxGeometry(width + 0.1, height + 0.1, depth + 0.04);
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color: colors.doorFrame,
+        roughness: 0.6
+      });
+      const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+      frame.position.set(x, height / 2, z);
+      frame.rotation.y = rotation;
+      frame.castShadow = true;
+      wallsGroup.add(frame);
+
+      // 门板
+      const doorGeometry = new THREE.BoxGeometry(width - 0.05, height - 0.1, depth);
+      const doorMaterial = new THREE.MeshStandardMaterial({
+        color: colors.door,
+        roughness: 0.5
+      });
+      const door = new THREE.Mesh(doorGeometry, doorMaterial);
+      door.position.set(x, height / 2, z);
+      door.rotation.y = rotation;
+      door.castShadow = true;
+      wallsGroup.add(door);
+
+      // 门把手
+      const handleGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+      const handleMaterial = new THREE.MeshStandardMaterial({
+        color: 0xC0C0C0,
+        metalness: 0.8,
+        roughness: 0.2
+      });
+      const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+      handle.position.set(
+        x + Math.cos(rotation) * (width / 2 - 0.15),
+        1.0,
+        z - Math.sin(rotation) * (width / 2 - 0.15)
+      );
+      wallsGroup.add(handle);
+    }
+
+    function createWindow(coordinates, props) {
+      const x = coordinates[0] * scale;
+      const z = coordinates[1] * scale;
+      const width = (props.width || 100) * scale;
+      const height = 1.2;
+      const depth = 0.06;
+      const rotation = (props.rotation || 0) * Math.PI / 180;
+      const windowY = 1.0;
+
+      // 窗框
+      const frameGeometry = new THREE.BoxGeometry(width + 0.1, height + 0.1, depth + 0.04);
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color: colors.windowFrame,
+        roughness: 0.4
+      });
+      const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+      frame.position.set(x, windowY + height / 2, z);
+      frame.rotation.y = rotation;
+      frame.castShadow = true;
+      wallsGroup.add(frame);
+
+      // 玻璃
+      const glassGeometry = new THREE.BoxGeometry(width - 0.1, height - 0.1, depth * 0.5);
+      const glassMaterial = new THREE.MeshStandardMaterial({
+        color: colors.window,
+        transparent: true,
+        opacity: 0.4,
+        roughness: 0.1,
+        metalness: 0.1
+      });
+      const glass = new THREE.Mesh(glassGeometry, glassMaterial);
+      glass.position.set(x, windowY + height / 2, z);
+      glass.rotation.y = rotation;
+      wallsGroup.add(glass);
+
+      // 窗格线
+      const dividerMaterial = new THREE.MeshStandardMaterial({ color: colors.windowFrame });
+
+      // 水平分割线
+      const hDivider = new THREE.Mesh(
+        new THREE.BoxGeometry(width - 0.1, 0.02, depth * 0.6),
+        dividerMaterial
+      );
+      hDivider.position.set(x, windowY + height / 2, z);
+      hDivider.rotation.y = rotation;
+      wallsGroup.add(hDivider);
+
+      // 垂直分割线
+      const vDivider = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, height - 0.1, depth * 0.6),
+        dividerMaterial
+      );
+      vDivider.position.set(x, windowY + height / 2, z);
+      vDivider.rotation.y = rotation;
+      wallsGroup.add(vDivider);
+    }
+
+    function createNavPath(coordinates) {
+      const points = coordinates.map(coord =>
+        new THREE.Vector3(coord[0] * scale, 0.05, coord[1] * scale)
+      );
+
+      // 路径线
+      const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.1);
+      const tubeGeometry = new THREE.TubeGeometry(curve, 50, 0.03, 8, false);
+      const tubeMaterial = new THREE.MeshStandardMaterial({
+        color: colors.navPath,
+        emissive: colors.navPath,
+        emissiveIntensity: 0.3,
+        roughness: 0.4
+      });
+      const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+      navPathGroup.add(tube);
+
+      // 添加发光效果
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: colors.navPath,
+        transparent: true,
+        opacity: 0.3
+      });
+      const glowTube = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 50, 0.06, 8, false),
+        glowMaterial
+      );
+      navPathGroup.add(glowTube);
+    }
+
+    function createNavPoint(coordinates) {
+      const x = coordinates[0] * scale;
+      const z = coordinates[1] * scale;
+
+      // 主球体
+      const sphereGeometry = new THREE.SphereGeometry(0.08, 32, 32);
+      const sphereMaterial = new THREE.MeshStandardMaterial({
+        color: colors.navPoint,
+        emissive: colors.navPoint,
+        emissiveIntensity: 0.4,
+        roughness: 0.3
+      });
+      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      sphere.position.set(x, 0.1, z);
+      navPathGroup.add(sphere);
+
+      // 外环
+      const ringGeometry = new THREE.RingGeometry(0.12, 0.15, 32);
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: colors.navPoint,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6
+      });
+      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      ring.position.set(x, 0.02, z);
+      ring.rotation.x = -Math.PI / 2;
+      navPathGroup.add(ring);
+    }
+
+    function createLabel(coordinates, text) {
+      const x = coordinates[0] * scale;
+      const z = coordinates[1] * scale;
+
+      // 创建文字精灵
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 256;
+      canvas.height = 64;
+
+      context.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      context.roundRect(0, 0, 256, 64, 10);
+      context.fill();
+
+      context.font = 'bold 28px Microsoft YaHei, Arial';
+      context.fillStyle = '#333333';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(text, 128, 32);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true
+      });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.position.set(x, 0.5, z);
+      sprite.scale.set(1.5, 0.4, 1);
+      sprite.userData = { text: text };
+      labelsGroup.add(sprite);
+    }
+
+    // 添加roundRect polyfill
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        this.beginPath();
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+        return this;
+      };
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const tooltip = document.getElementById('tooltip');
+
+    function onMouseMove(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(roomMeshes);
+
+      if (intersects.length > 0) {
+        const room = intersects[0].object;
+        const info = room.userData;
+
+        document.getElementById('room-info').innerHTML = `
+                    <strong>${info.name}</strong><br>
+                    面积: ${info.area} m²
+                `;
+
+        tooltip.textContent = info.name;
+        tooltip.style.left = event.clientX + 15 + 'px';
+        tooltip.style.top = event.clientY + 15 + 'px';
+        tooltip.classList.add('visible');
+
+        document.body.style.cursor = 'pointer';
+      } else {
+        tooltip.classList.remove('visible');
+        document.body.style.cursor = 'default';
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+
+      // 标签始终面向相机
+      labelsGroup.children.forEach(sprite => {
+        sprite.lookAt(camera.position);
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    // 控制函数
+    function resetCamera() {
+      camera.position.set(8, 10, 12);
+      controls.target.set(5, 0, 2);
+      controls.update();
+    }
+
+    function setTopView() {
+      camera.position.set(5, 15, 2);
+      controls.target.set(5, 0, 2);
+      controls.update();
+    }
+
+    function toggleWalls() {
+      wallsGroup.visible = !wallsGroup.visible;
+      document.getElementById('btn-walls').classList.toggle('active');
+    }
+
+    function toggleNavPath() {
+      navPathGroup.visible = !navPathGroup.visible;
+      document.getElementById('btn-nav').classList.toggle('active');
+    }
+
+    function toggleLabels() {
+      labelsGroup.visible = !labelsGroup.visible;
+      document.getElementById('btn-labels').classList.toggle('active');
+    }
+
+    // 初始化
+    init();
+  </script>
+</body>
+
+</html>

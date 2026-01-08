@@ -37,7 +37,13 @@
         <el-checkbox-group v-model="includeTypes">
           <el-checkbox label="wall">墙体</el-checkbox>
           <el-checkbox label="room">房间</el-checkbox>
+          <el-checkbox label="door">门</el-checkbox>
+          <el-checkbox label="window">窗户</el-checkbox>
+          <el-checkbox label="corridor">走廊</el-checkbox>
+          <el-checkbox label="hall">大厅</el-checkbox>
           <el-checkbox label="poi">兴趣点</el-checkbox>
+          <el-checkbox label="poster">海报</el-checkbox>
+          <el-checkbox label="text">文本标签</el-checkbox>
           <el-checkbox label="navpath">导航路径</el-checkbox>
           <el-checkbox label="navnode">导航节点</el-checkbox>
         </el-checkbox-group>
@@ -92,7 +98,19 @@ const { currentFloor, scale, unit } = storeToRefs(editorStore)
 const projectName = ref('室内地图')
 const exportFormat = ref('geojson')
 const floorSelection = ref('all')
-const includeTypes = ref(['wall', 'room', 'poi', 'navpath', 'navnode'])
+const includeTypes = ref([
+  'wall',
+  'room',
+  'door',
+  'window',
+  'corridor',
+  'hall',
+  'poi',
+  'poster',
+  'text',
+  'navpath',
+  'navnode'
+])
 const imageScale = ref(1)
 const includeGrid = ref(false)
 const exporting = ref(false)
@@ -319,6 +337,82 @@ function drawElementToCanvas(ctx: CanvasRenderingContext2D, el: any) {
     ctx.strokeStyle = el.style.strokeColor || '#1565C0'
     ctx.lineWidth = 2
     ctx.stroke()
+  } else if ((el.type === 'corridor' || el.type === 'hall') && el.points?.length >= 3) {
+    ctx.beginPath()
+    ctx.moveTo(el.points[0].x, el.points[0].y)
+    for (let i = 1; i < el.points.length; i++) {
+      ctx.lineTo(el.points[i].x, el.points[i].y)
+    }
+    ctx.closePath()
+    if (el.style.fillColor) {
+      ctx.fillStyle = el.style.fillColor
+      ctx.fill()
+    }
+    ctx.stroke()
+  } else if (el.type === 'door' && el.position) {
+    const pos = el.position
+    const width = el.width || 90
+    const rotation = (el.rotation || 0) * Math.PI / 180
+
+    ctx.save()
+    ctx.translate(pos.x, pos.y)
+    ctx.rotate(rotation)
+
+    // Draw door
+    ctx.fillStyle = el.style.fillColor || '#DEB887'
+    ctx.fillRect(-width/2, -5, width, 10)
+    ctx.strokeRect(-width/2, -5, width, 10)
+
+    ctx.restore()
+  } else if (el.type === 'window' && el.position) {
+    const pos = el.position
+    const width = el.width || 100
+    const rotation = (el.rotation || 0) * Math.PI / 180
+
+    ctx.save()
+    ctx.translate(pos.x, pos.y)
+    ctx.rotate(rotation)
+
+    // Draw window
+    ctx.strokeStyle = '#4169E1'
+    ctx.strokeRect(-width/2, -5, width, 10)
+    ctx.beginPath()
+    ctx.moveTo(-width/2, 0)
+    ctx.lineTo(width/2, 0)
+    ctx.stroke()
+
+    ctx.restore()
+  } else if (el.type === 'text' && el.position) {
+    const pos = el.position
+    const text = el.text || 'Text'
+    const fontSize = el.fontSize || 16
+    const fontFamily = el.fontFamily || 'Arial'
+    const color = el.color || '#333333'
+    const rotation = (el.rotation || 0) * Math.PI / 180
+    const alignment = el.alignment || 'center'
+    const bold = el.bold ? 'bold ' : ''
+    const italic = el.italic ? 'italic ' : ''
+
+    ctx.save()
+    ctx.translate(pos.x, pos.y)
+    ctx.rotate(rotation)
+
+    ctx.font = `${italic}${bold}${fontSize}px ${fontFamily}`
+    ctx.fillStyle = color
+    ctx.textAlign = alignment
+    ctx.textBaseline = 'middle'
+    ctx.fillText(text, 0, 0)
+
+    ctx.restore()
+  } else if (el.type === 'poster' && el.position) {
+    const pos = el.position
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2)
+    ctx.fillStyle = el.style.fillColor || '#FFC107'
+    ctx.fill()
+    ctx.strokeStyle = el.style.strokeColor || '#FF9800'
+    ctx.lineWidth = 2
+    ctx.stroke()
   }
 
   ctx.restore()
@@ -358,7 +452,7 @@ function exportSVG() {
   let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX - padding} ${minY - padding} ${width} ${height}">
   <style>
-    .wall { stroke: #333; stroke-width: 8; stroke-linecap: round; fill: none; }
+    .wall { stroke: #333; stroke-width: 2; stroke-linecap: round; fill: none; }
     .room { stroke: #666; stroke-width: 2; fill: #E8F4F8; fill-opacity: 0.5; }
     .navpath { stroke: #4CAF50; stroke-width: 2; stroke-dasharray: 8,4; fill: none; }
   </style>
@@ -372,11 +466,41 @@ function exportSVG() {
     } else if (el.type === 'room' && 'points' in el && el.points.length > 2) {
       const d = el.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + ' Z'
       svgContent += `  <path class="room" d="${d}"/>\n`
+    } else if ((el.type === 'corridor' || el.type === 'hall') && 'points' in el && el.points.length > 2) {
+      const d = el.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + ' Z'
+      const fillColor = el.type === 'corridor' ? '#F5F5F5' : '#FAFAFA'
+      svgContent += `  <path d="${d}" stroke="#888" stroke-width="2" fill="${fillColor}" fill-opacity="0.3"/>\n`
     } else if (el.type === 'navpath' && 'points' in el && el.points.length > 1) {
       const d = el.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
       svgContent += `  <path class="navpath" d="${d}"/>\n`
     } else if (el.type === 'poi' && 'position' in el) {
       svgContent += `  <circle cx="${el.position.x}" cy="${el.position.y}" r="8" fill="#FF6B6B"/>\n`
+    } else if (el.type === 'navnode' && 'position' in el) {
+      svgContent += `  <circle cx="${el.position.x}" cy="${el.position.y}" r="6" fill="#2196F3" stroke="#1565C0" stroke-width="2"/>\n`
+    } else if (el.type === 'door' && 'position' in el) {
+      const width = el.width || 90
+      const rotation = el.rotation || 0
+      // Use group with transform for rotation around center
+      svgContent += `  <g transform="translate(${el.position.x}, ${el.position.y}) rotate(${rotation})">\n`
+      svgContent += `    <rect x="${-width/2}" y="-5" width="${width}" height="10" fill="#DEB887" stroke="#8B4513" stroke-width="2"/>\n`
+      svgContent += `  </g>\n`
+    } else if (el.type === 'window' && 'position' in el) {
+      const width = el.width || 100
+      const rotation = el.rotation || 0
+      // Use group with transform for rotation around center
+      svgContent += `  <g transform="translate(${el.position.x}, ${el.position.y}) rotate(${rotation})">\n`
+      svgContent += `    <rect x="${-width/2}" y="-5" width="${width}" height="10" fill="none" stroke="#4169E1" stroke-width="2"/>\n`
+      svgContent += `    <line x1="${-width/2}" y1="0" x2="${width/2}" y2="0" stroke="#4169E1" stroke-width="1.5"/>\n`
+      svgContent += `  </g>\n`
+    } else if (el.type === 'text' && 'position' in el) {
+      const fontSize = el.fontSize || 16
+      const color = el.color || '#333333'
+      const text = el.text || 'Text'
+      const rotation = el.rotation || 0
+      // Use transform for text rotation
+      svgContent += `  <text x="${el.position.x}" y="${el.position.y}" font-size="${fontSize}" fill="${color}" text-anchor="middle" dominant-baseline="middle" transform="rotate(${rotation}, ${el.position.x}, ${el.position.y})">${text}</text>\n`
+    } else if (el.type === 'poster' && 'position' in el) {
+      svgContent += `  <circle cx="${el.position.x}" cy="${el.position.y}" r="6" fill="#FFC107" stroke="#FF9800" stroke-width="2"/>\n`
     }
   }
 

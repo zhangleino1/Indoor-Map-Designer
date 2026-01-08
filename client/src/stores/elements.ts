@@ -4,9 +4,14 @@ import type {
   MapElement,
   WallElement,
   RoomElement,
+  CorridorElement,
+  HallElement,
   DoorElement,
   WindowElement,
   POIElement,
+  POIType,
+  PosterElement,
+  TextElement,
   NavPathElement,
   NavNodeElement,
   Point,
@@ -16,18 +21,30 @@ import type {
 
 // Generate unique ID
 function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
 
 // Default styles
 const defaultStyles: Record<string, ElementStyle> = {
   wall: { strokeColor: '#333333', strokeWidth: 3, fillColor: undefined, opacity: 1 },
   room: { strokeColor: '#666666', strokeWidth: 2, fillColor: '#E8F4F8', opacity: 0.5 },
+  corridor: { strokeColor: '#999999', strokeWidth: 2, fillColor: '#F5F5F5', opacity: 0.3 },
+  hall: { strokeColor: '#888888', strokeWidth: 2, fillColor: '#FAFAFA', opacity: 0.3 },
   door: { strokeColor: '#8B4513', strokeWidth: 2, fillColor: '#DEB887', opacity: 1 },
   window: { strokeColor: '#4169E1', strokeWidth: 2, fillColor: '#87CEEB', opacity: 0.8 },
   poi: { strokeColor: '#FF6B6B', strokeWidth: 2, fillColor: '#FFE0E0', opacity: 1 },
+  poster: { strokeColor: '#FFC107', strokeWidth: 2, fillColor: '#FFECB3', opacity: 1 },
+  text: { strokeColor: '#333333', strokeWidth: 1, fillColor: undefined, opacity: 1 },
   navpath: { strokeColor: '#4CAF50', strokeWidth: 2, fillColor: undefined, opacity: 0.7 },
   navnode: { strokeColor: '#2196F3', strokeWidth: 2, fillColor: '#64B5F6', opacity: 1 }
+}
+
+// Configuration constants
+const CONFIG = {
+  MAX_HISTORY_LENGTH: 50,
+  DEFAULT_DOOR_WIDTH: 90,
+  DEFAULT_WINDOW_WIDTH: 100,
+  DEFAULT_WALL_THICKNESS: 1.5
 }
 
 export const useElementsStore = defineStore('elements', () => {
@@ -39,7 +56,6 @@ export const useElementsStore = defineStore('elements', () => {
   // History for undo/redo
   const history = ref<HistoryAction[]>([])
   const historyIndex = ref<number>(-1)
-  const maxHistoryLength = 50
 
   // Computed: get elements for current floor
   function getElementsByFloor(floor: number): MapElement[] {
@@ -87,7 +103,7 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Create wall
-  function createWall(floor: number, points: Point[], thickness: number = 5): string {
+  function createWall(floor: number, points: Point[], thickness: number = CONFIG.DEFAULT_WALL_THICKNESS): string {
     return addElement({
       type: 'wall',
       floor,
@@ -109,13 +125,13 @@ export const useElementsStore = defineStore('elements', () => {
     } as Omit<RoomElement, 'id' | 'visible' | 'locked' | 'style'>)
   }
 
-  // Create POI
-  function createPOI(floor: number, position: Point, poiType: string = 'custom', name?: string, accessNodeId?: string): string {
+  // Create POI with strict type validation
+  function createPOI(floor: number, position: Point, poiType: POIType = 'custom', name?: string, accessNodeId?: string): string {
     return addElement({
       type: 'poi',
       floor,
       position: { ...position },
-      poiType,
+      poiType,  // Now typed as POIType, preventing invalid values
       name,
       accessNodeId
     } as unknown as Omit<POIElement, 'id' | 'visible' | 'locked' | 'style'>)
@@ -130,7 +146,8 @@ export const useElementsStore = defineStore('elements', () => {
     endNodeId?: string,
     distance?: number
   ): string {
-    return addElement({
+
+    const pathId = addElement({
       type: 'navpath',
       floor,
       points: [...points],
@@ -139,20 +156,112 @@ export const useElementsStore = defineStore('elements', () => {
       endNodeId,
       distance
     } as Omit<NavPathElement, 'id' | 'visible' | 'locked' | 'style'>)
+
+    const nodesToUpdate: Array<{ id: string, oldPaths: string[], newPaths: string[] }> = []
+
+    // Auto-associate with connected nodes (without creating history entries)
+    if (startNodeId) {
+      const startNode = getElementById(startNodeId) as NavNodeElement | undefined
+      if (startNode && startNode.type === 'navnode') {
+        if (!startNode.connectedPaths.includes(pathId)) {
+          const oldPaths = [...startNode.connectedPaths]
+          const newPaths = [...startNode.connectedPaths, pathId]
+          startNode.connectedPaths = newPaths
+          nodesToUpdate.push({ id: startNodeId, oldPaths, newPaths })
+        }
+      }
+    }
+
+    if (endNodeId && endNodeId !== startNodeId) {
+      const endNode = getElementById(endNodeId) as NavNodeElement | undefined
+      if (endNode && endNode.type === 'navnode') {
+        if (!endNode.connectedPaths.includes(pathId)) {
+          const oldPaths = [...endNode.connectedPaths]
+          const newPaths = [...endNode.connectedPaths, pathId]
+          endNode.connectedPaths = newPaths
+          nodesToUpdate.push({ id: endNodeId, oldPaths, newPaths })
+        }
+      }
+    }
+
+    // Record a single batch history entry for path creation + node associations
+    if (nodesToUpdate.length > 0) {
+      const path = getElementById(pathId)
+      const updatedNodes = nodesToUpdate.map(n => getElementById(n.id)!).filter(Boolean)
+
+      // Remove the last history entry (path creation) and replace with batch
+      if (history.value.length > 0) {
+        history.value.pop()
+        historyIndex.value--
+      }
+
+      // Add batch entry
+      pushHistory({
+        type: 'batch',
+        elements: [path!, ...updatedNodes],
+        previousState: [
+          path!,
+          ...nodesToUpdate.map(n => {
+            const node = getElementById(n.id)!
+            return { ...node, connectedPaths: n.oldPaths } as MapElement
+          })
+        ]
+      })
+    }
+
+    return pathId
   }
 
   // Create navigation node
-  function createNavNode(floor: number, position: Point): string {
-    return addElement({
+  function createNavNode(floor: number, position: Point, id?: string): string {
+    // Determine final ID BEFORE adding element (fixes history consistency)
+    let finalId: string
+    let index: number | undefined
+
+    if (id) {
+      // Use provided ID
+      finalId = id
+      const validation = validateNavNodeId(id)
+      if (validation.valid) {
+        index = validation.index
+      }
+    } else {
+      // Auto-generate ID with default corridor 'a'
+      finalId = generateNavNodeId(floor, 'a')
+      const validation = validateNavNodeId(finalId)
+      index = validation.index
+    }
+
+    // Create element with pre-determined ID directly (bypass addElement to avoid ID regeneration)
+    if (!elementsByFloor.value[floor]) {
+      elementsByFloor.value[floor] = []
+    }
+
+    const newElement: NavNodeElement = {
+      id: finalId,
       type: 'navnode',
       floor,
       position: { ...position },
-      connectedPaths: []
-    } as Omit<NavNodeElement, 'id' | 'visible' | 'locked' | 'style'>)
+      connectedPaths: [],
+      index,
+      visible: true,
+      locked: false,
+      style: { ...defaultStyles['navnode'] }
+    }
+
+    elementsByFloor.value[floor].push(newElement)
+
+    // Add to history with correct ID
+    pushHistory({
+      type: 'add',
+      elements: [newElement]
+    })
+
+    return finalId
   }
 
   // Create door
-  function createDoor(floor: number, position: Point, width: number = 90, rotation: number = 0): string {
+  function createDoor(floor: number, position: Point, width: number = CONFIG.DEFAULT_DOOR_WIDTH, rotation: number = 0): string {
     return addElement({
       type: 'door',
       floor,
@@ -164,7 +273,7 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Create window
-  function createWindow(floor: number, position: Point, width: number = 100, rotation: number = 0): string {
+  function createWindow(floor: number, position: Point, width: number = CONFIG.DEFAULT_WINDOW_WIDTH, rotation: number = 0): string {
     return addElement({
       type: 'window',
       floor,
@@ -172,6 +281,72 @@ export const useElementsStore = defineStore('elements', () => {
       width,
       rotation
     } as Omit<WindowElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create corridor
+  function createCorridor(floor: number, points: Point[], name?: string): string {
+    const area = calculatePolygonArea(points)
+    return addElement({
+      type: 'corridor',
+      floor,
+      points: [...points],
+      name,
+      area
+    } as Omit<CorridorElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create hall
+  function createHall(floor: number, points: Point[], name?: string): string {
+    const area = calculatePolygonArea(points)
+    return addElement({
+      type: 'hall',
+      floor,
+      points: [...points],
+      name,
+      area
+    } as Omit<HallElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create poster
+  function createPoster(floor: number, position: Point, name?: string, rotation?: string, vertexId?: string): string {
+    return addElement({
+      type: 'poster',
+      floor,
+      position: { ...position },
+      name,
+      rotation,
+      vertexId
+    } as Omit<PosterElement, 'id' | 'visible' | 'locked' | 'style'>)
+  }
+
+  // Create text label
+  function createText(
+    floor: number,
+    position: Point,
+    text: string = 'Text',
+    options?: {
+      fontSize?: number
+      fontFamily?: string
+      color?: string
+      rotation?: number
+      alignment?: 'left' | 'center' | 'right'
+      bold?: boolean
+      italic?: boolean
+    }
+  ): string {
+    return addElement({
+      type: 'text',
+      floor,
+      position: { ...position },
+      text,
+      fontSize: options?.fontSize || 16,
+      fontFamily: options?.fontFamily || 'Arial',
+      color: options?.color || '#333333',
+      rotation: options?.rotation || 0,
+      alignment: options?.alignment || 'center',
+      bold: options?.bold || false,
+      italic: options?.italic || false
+    } as Omit<TextElement, 'id' | 'visible' | 'locked' | 'style'>)
   }
 
   // Update element
@@ -199,32 +374,211 @@ export const useElementsStore = defineStore('elements', () => {
       const elements = elementsByFloor.value[floor]
       const index = elements.findIndex(el => el.id === id)
       if (index !== -1) {
+        const element = elements[index]
+        const affectedElements: MapElement[] = [element]
+        const previousStates: MapElement[] = [{ ...element }]
+
+        // Clean up associations before deleting (without creating separate history entries)
+        if (element.type === 'navpath') {
+          // Remove this path from connected nodes
+          const navPath = element as NavPathElement
+          if (navPath.startNodeId) {
+            const startNode = getElementById(navPath.startNodeId) as NavNodeElement | undefined
+            if (startNode && startNode.type === 'navnode') {
+              const oldPaths = [...startNode.connectedPaths]
+              const newPaths = startNode.connectedPaths.filter(pid => pid !== id)
+              if (oldPaths.length !== newPaths.length) {
+                previousStates.push({ ...startNode })
+                startNode.connectedPaths = newPaths
+                affectedElements.push(startNode)
+              }
+            }
+          }
+          if (navPath.endNodeId && navPath.endNodeId !== navPath.startNodeId) {
+            const endNode = getElementById(navPath.endNodeId) as NavNodeElement | undefined
+            if (endNode && endNode.type === 'navnode') {
+              const oldPaths = [...endNode.connectedPaths]
+              const newPaths = endNode.connectedPaths.filter(pid => pid !== id)
+              if (oldPaths.length !== newPaths.length) {
+                previousStates.push({ ...endNode })
+                endNode.connectedPaths = newPaths
+                affectedElements.push(endNode)
+              }
+            }
+          }
+        } else if (element.type === 'navnode') {
+          // Remove node reference from connected paths
+          const navNode = element as NavNodeElement
+          navNode.connectedPaths.forEach(pathId => {
+            const path = getElementById(pathId) as NavPathElement | undefined
+            if (path && path.type === 'navpath') {
+              const oldPath = { ...path }
+              const updates: Partial<NavPathElement> = {}
+              if (path.startNodeId === id) {
+                updates.startNodeId = undefined
+              }
+              if (path.endNodeId === id) {
+                updates.endNodeId = undefined
+              }
+              if (Object.keys(updates).length > 0) {
+                Object.assign(path, updates)
+                previousStates.push(oldPath)
+                affectedElements.push(path)
+              }
+            }
+          })
+        }
+
         const deleted = elements.splice(index, 1)
+
+        // Push single batch history entry for deletion + cleanups
         pushHistory({
-          type: 'delete',
-          elements: deleted
+          type: affectedElements.length > 1 ? 'batch' : 'delete',
+          elements: deleted,
+          previousState: affectedElements.length > 1 ? previousStates : undefined
         })
         return
       }
     }
   }
 
-  // Delete multiple elements
+  // Helper: Validate NavNode ID format (Python format: a1, b2, c3, etc.)
+  function validateNavNodeId(id: string): { valid: boolean; corridor?: string; index?: number; error?: string } {
+    const match = id.match(/^([a-z]+)(\d+)$/i)
+    if (!match) {
+      return {
+        valid: false,
+        error: 'ID must be in format: letter(s) + number (e.g., a1, b2, corridor3)'
+      }
+    }
+    return {
+      valid: true,
+      corridor: match[1].toLowerCase(),
+      index: parseInt(match[2])
+    }
+  }
+
+  // Helper: Get NavNodes in same corridor
+  function getCorridorNavNodes(corridorId: string, floor?: number): NavNodeElement[] {
+    const nodes: NavNodeElement[] = []
+    const floorsToCheck: (number | string)[] = floor !== undefined ? [floor] : Object.keys(elementsByFloor.value)
+
+    floorsToCheck.forEach((f: number | string) => {
+      const elements = elementsByFloor.value[f as number] || []
+      elements.forEach((el: MapElement) => {
+        if (el.type === 'navnode') {
+          const validation = validateNavNodeId(el.id)
+          if (validation.valid && validation.corridor === corridorId.toLowerCase()) {
+            nodes.push(el as NavNodeElement)
+          }
+        }
+      })
+    })
+
+    // Sort by index
+    return nodes.sort((a, b) => {
+      const aVal = validateNavNodeId(a.id)
+      const bVal = validateNavNodeId(b.id)
+      return (aVal.index || 0) - (bVal.index || 0)
+    })
+  }
+
+  // Helper: Auto-assign NavNode index based on corridor
+  function generateNavNodeId(floor: number, corridorId: string = 'a'): string {
+    const existingNodes = getCorridorNavNodes(corridorId, floor)
+    const maxIndex = existingNodes.length > 0
+      ? Math.max(...existingNodes.map(n => validateNavNodeId(n.id).index || 0))
+      : 0
+    return `${corridorId}${maxIndex + 1}`
+  }
+
+  // Delete multiple elements with cascade cleanup
   function deleteElements(ids: string[]) {
     const deleted: MapElement[] = []
+    const affectedElements: MapElement[] = []
+    const previousStates: MapElement[] = []
+
+    // First, collect elements to delete
     for (const floor in elementsByFloor.value) {
-      elementsByFloor.value[floor] = elementsByFloor.value[floor].filter(el => {
+      for (const el of elementsByFloor.value[floor]) {
         if (ids.includes(el.id)) {
           deleted.push(el)
-          return false
+          previousStates.push({ ...el })
+
+          // Perform cascade cleanup for each element
+          if (el.type === 'navpath') {
+            const navPath = el as NavPathElement
+            // Remove this path from connected nodes
+            if (navPath.startNodeId && !ids.includes(navPath.startNodeId)) {
+              const startNode = getElementById(navPath.startNodeId) as NavNodeElement | undefined
+              if (startNode && startNode.type === 'navnode') {
+                const oldPaths = [...startNode.connectedPaths]
+                const newPaths = startNode.connectedPaths.filter(pid => pid !== el.id)
+                if (oldPaths.length !== newPaths.length) {
+                  if (!affectedElements.some(e => e.id === startNode.id)) {
+                    previousStates.push({ ...startNode })
+                    startNode.connectedPaths = newPaths
+                    affectedElements.push(startNode)
+                  }
+                }
+              }
+            }
+            if (navPath.endNodeId && navPath.endNodeId !== navPath.startNodeId && !ids.includes(navPath.endNodeId)) {
+              const endNode = getElementById(navPath.endNodeId) as NavNodeElement | undefined
+              if (endNode && endNode.type === 'navnode') {
+                const oldPaths = [...endNode.connectedPaths]
+                const newPaths = endNode.connectedPaths.filter(pid => pid !== el.id)
+                if (oldPaths.length !== newPaths.length) {
+                  if (!affectedElements.some(e => e.id === endNode.id)) {
+                    previousStates.push({ ...endNode })
+                    endNode.connectedPaths = newPaths
+                    affectedElements.push(endNode)
+                  }
+                }
+              }
+            }
+          } else if (el.type === 'navnode') {
+            const navNode = el as NavNodeElement
+            // Remove node reference from connected paths
+            navNode.connectedPaths.forEach(pathId => {
+              if (!ids.includes(pathId)) {
+                const path = getElementById(pathId) as NavPathElement | undefined
+                if (path && path.type === 'navpath') {
+                  if (!affectedElements.some(e => e.id === path.id)) {
+                    const oldPath = { ...path }
+                    const updates: Partial<NavPathElement> = {}
+                    if (path.startNodeId === el.id) {
+                      updates.startNodeId = undefined
+                    }
+                    if (path.endNodeId === el.id) {
+                      updates.endNodeId = undefined
+                    }
+                    if (Object.keys(updates).length > 0) {
+                      Object.assign(path, updates)
+                      previousStates.push(oldPath)
+                      affectedElements.push(path)
+                    }
+                  }
+                }
+              }
+            })
+          }
         }
-        return true
-      })
+      }
     }
+
+    // Now delete the elements
+    for (const floor in elementsByFloor.value) {
+      elementsByFloor.value[floor] = elementsByFloor.value[floor].filter(el => !ids.includes(el.id))
+    }
+
+    // Push to history with all affected elements
     if (deleted.length > 0) {
+      const allAffected = [...deleted, ...affectedElements]
       pushHistory({
-        type: 'delete',
-        elements: deleted
+        type: 'batch',
+        elements: allAffected,
+        previousState: previousStates
       })
     }
   }
@@ -250,6 +604,44 @@ export const useElementsStore = defineStore('elements', () => {
     }
   }
 
+  // Update element points (for walls, paths, polygons, rooms)
+  function updateElementPoints(id: string, points: Point[]) {
+    const element = getElementById(id)
+    if (!element) return
+
+    // Only works for elements with points array
+    if (!('points' in element)) return
+
+    updateElement(id, { points: [...points] } as Partial<MapElement>)
+  }
+
+  // Remove a point from element by index
+  function removePointFromElement(id: string, pointIndex: number) {
+    const element = getElementById(id)
+    if (!element) return
+
+    // Only works for elements with points array
+    if (!('points' in element)) return
+
+    const newPoints = [...element.points]
+    newPoints.splice(pointIndex, 1)
+
+    // Determine minimum points required
+    let minPoints = 2
+    if (element.type === 'room' || element.type === 'corridor' || element.type === 'hall') {
+      minPoints = 3 // Polygons need at least 3 points
+    }
+
+    // If not enough points left, delete the entire element
+    if (newPoints.length < minPoints) {
+      deleteElement(id)
+      return
+    }
+
+    // Update with new points
+    updateElement(id, { points: newPoints } as Partial<MapElement>)
+  }
+
   // History management
   function pushHistory(action: HistoryAction) {
     // Remove any redo history
@@ -258,7 +650,7 @@ export const useElementsStore = defineStore('elements', () => {
     historyIndex.value++
 
     // Limit history length
-    if (history.value.length > maxHistoryLength) {
+    if (history.value.length > CONFIG.MAX_HISTORY_LENGTH) {
       history.value.shift()
       historyIndex.value--
     }
@@ -288,6 +680,15 @@ export const useElementsStore = defineStore('elements', () => {
       }
     } else if (action.type === 'update' && action.previousState) {
       // Restore previous state
+      for (const element of action.previousState) {
+        const floor = element.floor
+        const index = elementsByFloor.value[floor]?.findIndex(el => el.id === element.id)
+        if (index !== undefined && index !== -1) {
+          elementsByFloor.value[floor][index] = element
+        }
+      }
+    } else if (action.type === 'batch' && action.previousState) {
+      // Restore all elements to previous state (for batch operations)
       for (const element of action.previousState) {
         const floor = element.floor
         const index = elementsByFloor.value[floor]?.findIndex(el => el.id === element.id)
@@ -332,6 +733,15 @@ export const useElementsStore = defineStore('elements', () => {
           elementsByFloor.value[floor][index] = element
         }
       }
+    } else if (action.type === 'batch') {
+      // Re-apply batch updates
+      for (const element of action.elements) {
+        const floor = element.floor
+        const index = elementsByFloor.value[floor]?.findIndex(el => el.id === element.id)
+        if (index !== undefined && index !== -1) {
+          elementsByFloor.value[floor][index] = element
+        }
+      }
     }
   }
 
@@ -361,26 +771,83 @@ export const useElementsStore = defineStore('elements', () => {
   }
 
   // Import multiple elements (supports undo as a single action)
-  function importElements(elements: Array<Omit<MapElement, 'id' | 'visible' | 'locked' | 'style'> & Partial<Pick<MapElement, 'style'>>>) {
+  // Now preserves IDs to maintain navigation graph references
+  function importElements(elements: Array<Partial<Pick<MapElement, 'id'>> & Omit<MapElement, 'id' | 'visible' | 'locked' | 'style'> & Partial<Pick<MapElement, 'style'>>>) {
     const importedElements: MapElement[] = []
+    const idMapping = new Map<string, string>() // Track old ID -> new ID for reference updates
 
+    // First pass: Import all elements and build ID mapping
     for (const element of elements) {
       const floor = element.floor
       if (!elementsByFloor.value[floor]) {
         elementsByFloor.value[floor] = []
       }
 
-      const newElement: MapElement = {
-        ...element,
-        id: generateId(),
-        visible: true,
-        locked: false,
-        style: element.style || { ...defaultStyles[element.type] }
-      } as MapElement
+      // Preserve original ID if provided, otherwise generate new one
+      const originalId = 'id' in element ? element.id : undefined
+      const finalId = originalId || generateId()
 
-      elementsByFloor.value[floor].push(newElement)
-      importedElements.push(newElement)
+      // Check for ID conflicts
+      const existingElement = getElementById(finalId)
+      if (existingElement && originalId) {
+        // ID conflict - generate new ID and track mapping
+        const newId = generateId()
+        idMapping.set(originalId, newId)
+
+        const newElement: MapElement = {
+          ...element,
+          id: newId,
+          visible: true,
+          locked: false,
+          style: element.style || { ...defaultStyles[element.type] }
+        } as MapElement
+
+        elementsByFloor.value[floor].push(newElement)
+        importedElements.push(newElement)
+      } else {
+        // No conflict - use original or new ID
+        const newElement: MapElement = {
+          ...element,
+          id: finalId,
+          visible: true,
+          locked: false,
+          style: element.style || { ...defaultStyles[element.type] }
+        } as MapElement
+
+        elementsByFloor.value[floor].push(newElement)
+        importedElements.push(newElement)
+      }
     }
+
+    // Second pass: Update all references if there were ID conflicts
+    if (idMapping.size > 0) {
+      for (const element of importedElements) {
+        if (element.type === 'navpath') {
+          const navPath = element as NavPathElement
+          if (navPath.startNodeId && idMapping.has(navPath.startNodeId)) {
+            navPath.startNodeId = idMapping.get(navPath.startNodeId)
+          }
+          if (navPath.endNodeId && idMapping.has(navPath.endNodeId)) {
+            navPath.endNodeId = idMapping.get(navPath.endNodeId)
+          }
+        } else if (element.type === 'navnode') {
+          const navNode = element as NavNodeElement
+          if (navNode.connectedPaths && navNode.connectedPaths.length > 0) {
+            navNode.connectedPaths = navNode.connectedPaths.map(pathId =>
+              idMapping.get(pathId) || pathId
+            )
+          }
+        } else if (element.type === 'poi') {
+          const poi = element as POIElement
+          if (poi.accessNodeId && idMapping.has(poi.accessNodeId)) {
+            poi.accessNodeId = idMapping.get(poi.accessNodeId)
+          }
+        }
+      }
+    }
+
+    // Third pass: Reconstruct navigation graph to ensure consistency
+    reconstructNavigationGraph(importedElements)
 
     // Add all imported elements as a single history action
     if (importedElements.length > 0) {
@@ -391,6 +858,73 @@ export const useElementsStore = defineStore('elements', () => {
     }
 
     return importedElements.length
+  }
+
+  // Helper function: Reconstruct navigation graph after import
+  function reconstructNavigationGraph(elements: MapElement[]) {
+    const nodes = new Map<string, NavNodeElement>()
+    const paths: NavPathElement[] = []
+
+    // Collect nodes and paths from imported elements
+    for (const el of elements) {
+      if (el.type === 'navnode') {
+        nodes.set(el.id, el as NavNodeElement)
+      } else if (el.type === 'navpath') {
+        paths.push(el as NavPathElement)
+      }
+    }
+
+    // Clear connectedPaths for all imported nodes
+    nodes.forEach(node => {
+      node.connectedPaths = []
+    })
+
+    // Rebuild connectedPaths from paths
+    for (const path of paths) {
+      if (path.startNodeId && nodes.has(path.startNodeId)) {
+        const startNode = nodes.get(path.startNodeId)!
+        if (!startNode.connectedPaths.includes(path.id)) {
+          startNode.connectedPaths.push(path.id)
+        }
+      }
+      if (path.endNodeId && nodes.has(path.endNodeId)) {
+        const endNode = nodes.get(path.endNodeId)!
+        if (!endNode.connectedPaths.includes(path.id)) {
+          endNode.connectedPaths.push(path.id)
+        }
+      }
+    }
+
+    // Also check for existing nodes in the store that might reference imported paths
+    for (const floor in elementsByFloor.value) {
+      for (const el of elementsByFloor.value[floor]) {
+        if (el.type === 'navnode' && !nodes.has(el.id)) {
+          const navNode = el as NavNodeElement
+          // Check if this existing node references any newly imported paths
+          for (const path of paths) {
+            if ((path.startNodeId === navNode.id || path.endNodeId === navNode.id) &&
+                !navNode.connectedPaths.includes(path.id)) {
+              navNode.connectedPaths.push(path.id)
+            }
+          }
+        } else if (el.type === 'navpath' && !paths.some(p => p.id === el.id)) {
+          const navPath = el as NavPathElement
+          // Check if this existing path references any newly imported nodes
+          if (navPath.startNodeId && nodes.has(navPath.startNodeId)) {
+            const startNode = nodes.get(navPath.startNodeId)!
+            if (!startNode.connectedPaths.includes(navPath.id)) {
+              startNode.connectedPaths.push(navPath.id)
+            }
+          }
+          if (navPath.endNodeId && nodes.has(navPath.endNodeId)) {
+            const endNode = nodes.get(navPath.endNodeId)!
+            if (!endNode.connectedPaths.includes(navPath.id)) {
+              endNode.connectedPaths.push(navPath.id)
+            }
+          }
+        }
+      }
+    }
   }
 
   // Copy elements from one floor to another
@@ -468,7 +1002,11 @@ export const useElementsStore = defineStore('elements', () => {
     addElement,
     createWall,
     createRoom,
+    createCorridor,
+    createHall,
     createPOI,
+    createPoster,
+    createText,
     createNavPath,
     createNavNode,
     createDoor,
@@ -477,6 +1015,8 @@ export const useElementsStore = defineStore('elements', () => {
     deleteElement,
     deleteElements,
     moveElement,
+    updateElementPoints,
+    removePointFromElement,
     undo,
     redo,
     canUndo,
@@ -488,7 +1028,11 @@ export const useElementsStore = defineStore('elements', () => {
     saveToStorage,
     loadFromStorage,
     hasSavedData,
-    clearSavedData
+    clearSavedData,
+    // Navigation helpers
+    validateNavNodeId,
+    getCorridorNavNodes,
+    generateNavNodeId
   }
 })
 

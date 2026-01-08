@@ -2,6 +2,7 @@
   <div
     ref="containerRef"
     class="canvas-wrapper"
+    :style="{ cursor: cursorStyle }"
     @wheel="handleWheel"
     @mousedown="handleMouseDown"
     @mousemove="handleMouseMove"
@@ -26,11 +27,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { ElMessageBox } from 'element-plus'
 import { useEditorStore } from '@/stores/editor'
 import { useElementsStore } from '@/stores/elements'
 import type { Point, MapElement, ToolType } from '@/types'
-import { snapPoint, type SnapOptions } from '@/utils/snap'
-import type { SnapResult } from '@/types'
+import { snapPoint } from '@/utils/snap'
 import {
   distance,
   elementContainsPoint,
@@ -75,10 +76,27 @@ const dimensionPos = ref<Point>({ x: 0, y: 0 })
 // Snap type for visual feedback
 const currentSnapType = ref<'none' | 'grid' | 'endpoint' | 'midpoint'>('none')
 
+// Control point editing state
+const hoveredControlPoint = ref<{ elementId: string; pointIndex: number } | null>(null)
+const selectedControlPoint = ref<{ elementId: string; pointIndex: number } | null>(null)
+const isDraggingControlPoint = ref(false)
+const controlPointDragStart = ref<Point | null>(null)
+
+// ResizeObserver for container size changes
+let resizeObserver: ResizeObserver | null = null
+
 const dimensionLabelStyle = computed(() => ({
   left: `${dimensionPos.value.x}px`,
   top: `${dimensionPos.value.y}px`
 }))
+
+// Cursor style based on current tool
+const cursorStyle = computed(() => {
+  if (currentTool.value === 'select') {
+    return 'default'
+  }
+  return 'crosshair'
+})
 
 // Get current floor elements
 const currentElements = computed(() => {
@@ -93,7 +111,14 @@ onMounted(() => {
 
   ctx.value = canvasRef.value.getContext('2d')
   resizeCanvas()
-  window.addEventListener('resize', resizeCanvas)
+
+  // Use ResizeObserver to watch container size changes
+  // This handles both drag-resize and maximize/restore events
+  resizeObserver = new ResizeObserver(() => {
+    resizeCanvas()
+  })
+  resizeObserver.observe(containerRef.value)
+
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
   window.addEventListener('saveDrawing', handleSaveDrawingEvent as EventListener)
@@ -103,7 +128,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', resizeCanvas)
+  // Disconnect ResizeObserver
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
   window.removeEventListener('saveDrawing', handleSaveDrawingEvent as EventListener)
@@ -128,7 +158,7 @@ function switchTool(newTool: ToolType) {
 // 将绘制的点保存为元素
 function saveDrawingAsElement(points: Point[], tool: ToolType, floor: number) {
   if (points.length < 1) return
-  
+
   switch (tool) {
     case 'wall':
       if (points.length >= 2) {
@@ -139,6 +169,18 @@ function saveDrawingAsElement(points: Point[], tool: ToolType, floor: number) {
       if (points.length >= 2) {
         const rect = createRectangle(points[0], points[points.length - 1])
         elementsStore.createRoom(floor, rect)
+      }
+      break
+    case 'corridor':
+      if (points.length >= 2) {
+        const rect = createRectangle(points[0], points[points.length - 1])
+        elementsStore.createCorridor(floor, rect)
+      }
+      break
+    case 'hall':
+      if (points.length >= 2) {
+        const rect = createRectangle(points[0], points[points.length - 1])
+        elementsStore.createHall(floor, rect)
       }
       break
     case 'polygon':
@@ -154,6 +196,10 @@ function saveDrawingAsElement(points: Point[], tool: ToolType, floor: number) {
     case 'poi':
       // POI只需要一个点
       elementsStore.createPOI(floor, points[0], currentPoiType.value)
+      break
+    case 'poster':
+      // 海报只需要一个点
+      elementsStore.createPoster(floor, points[0])
       break
     case 'navnode':
       // 导航节点只需要一个点
@@ -176,6 +222,15 @@ watch([
 ], () => {
   render()
 }, { deep: true })
+
+// Watch for tool changes to clear UI state (fixes High #2)
+watch(currentTool, () => {
+  selectedControlPoint.value = null
+  hoveredControlPoint.value = null
+  currentDimension.value = ''
+  isDraggingControlPoint.value = false
+  controlPointDragStart.value = null
+})
 
 function resizeCanvas() {
   if (!canvasRef.value || !containerRef.value) return
@@ -286,8 +341,20 @@ function drawElement(c: CanvasRenderingContext2D, element: MapElement) {
     case 'room':
       drawRoom(c, element)
       break
+    case 'corridor':
+      drawCorridor(c, element)
+      break
+    case 'hall':
+      drawHall(c, element)
+      break
     case 'poi':
       drawPOI(c, element)
+      break
+    case 'poster':
+      drawPoster(c, element)
+      break
+    case 'text':
+      drawText(c, element)
       break
     case 'navpath':
       drawNavPath(c, element)
@@ -381,6 +448,70 @@ function drawRoom(c: CanvasRenderingContext2D, element: any) {
     c.save()
     c.fillStyle = '#666'
     c.font = '14px Arial'
+    c.textAlign = 'center'
+    c.textBaseline = 'middle'
+    c.fillText(element.name, centerX, centerY)
+    c.restore()
+  }
+}
+
+function drawCorridor(c: CanvasRenderingContext2D, element: any) {
+  if (element.points.length < 3) return
+
+  c.beginPath()
+  c.moveTo(element.points[0].x, element.points[0].y)
+  for (let i = 1; i < element.points.length; i++) {
+    c.lineTo(element.points[i].x, element.points[i].y)
+  }
+  c.closePath()
+
+  if (element.style.fillColor) {
+    c.fillStyle = element.style.fillColor
+    c.fill()
+  }
+  c.stroke()
+
+  // Draw corridor name if exists
+  if (element.name) {
+    const bounds = getBoundsFromPoints(element.points)
+    const centerX = (bounds.minX + bounds.maxX) / 2
+    const centerY = (bounds.minY + bounds.maxY) / 2
+
+    c.save()
+    c.fillStyle = '#999'
+    c.font = '12px Arial'
+    c.textAlign = 'center'
+    c.textBaseline = 'middle'
+    c.fillText(element.name, centerX, centerY)
+    c.restore()
+  }
+}
+
+function drawHall(c: CanvasRenderingContext2D, element: any) {
+  if (element.points.length < 3) return
+
+  c.beginPath()
+  c.moveTo(element.points[0].x, element.points[0].y)
+  for (let i = 1; i < element.points.length; i++) {
+    c.lineTo(element.points[i].x, element.points[i].y)
+  }
+  c.closePath()
+
+  if (element.style.fillColor) {
+    c.fillStyle = element.style.fillColor
+    c.fill()
+  }
+  c.stroke()
+
+  // Draw hall name if exists
+  if (element.name) {
+    const bounds = getBoundsFromPoints(element.points)
+    const centerX = (bounds.minX + bounds.maxX) / 2
+    const centerY = (bounds.minY + bounds.maxY) / 2
+
+    c.save()
+    c.fillStyle = '#888'
+    c.font = '16px Arial'
     c.textAlign = 'center'
     c.textBaseline = 'middle'
     c.fillText(element.name, centerX, centerY)
@@ -569,6 +700,92 @@ function drawPOIIcon(c: CanvasRenderingContext2D, x: number, y: number, type: st
   c.restore()
 }
 
+function drawPoster(c: CanvasRenderingContext2D, element: any) {
+  const pos = element.position
+  const size = 16
+
+  // Draw poster icon (like a bulletin board)
+  c.save()
+
+  // Draw background rectangle
+  c.fillStyle = element.style.fillColor || '#FFC107'
+  c.fillRect(pos.x - size / 2, pos.y - size / 2, size, size)
+
+  // Draw border
+  c.strokeStyle = element.style.strokeColor || '#FF9800'
+  c.lineWidth = 2
+  c.strokeRect(pos.x - size / 2, pos.y - size / 2, size, size)
+
+  // Draw poster icon (P symbol)
+  c.fillStyle = '#fff'
+  c.font = 'bold 12px Arial'
+  c.textAlign = 'center'
+  c.textBaseline = 'middle'
+  c.fillText('P', pos.x, pos.y)
+
+  // Draw poster name if exists
+  if (element.name) {
+    c.fillStyle = '#333'
+    c.font = '11px Arial'
+    c.textAlign = 'center'
+    c.textBaseline = 'top'
+    c.fillText(element.name, pos.x, pos.y + size / 2 + 4)
+  }
+
+  c.restore()
+}
+
+// Draw text label
+function drawText(c: CanvasRenderingContext2D, element: any) {
+  const pos = element.position
+  const text = element.text || 'Text'
+  const fontSize = element.fontSize || 16
+  const fontFamily = element.fontFamily || 'Arial'
+  const color = element.color || '#333333'
+  const rotation = element.rotation || 0
+  const alignment = element.alignment || 'center'
+  const bold = element.bold || false
+  const italic = element.italic || false
+
+  c.save()
+
+  // Move to position and rotate
+  c.translate(pos.x, pos.y)
+  c.rotate((rotation * Math.PI) / 180)
+
+  // Set font style
+  let fontStyle = ''
+  if (italic) fontStyle += 'italic '
+  if (bold) fontStyle += 'bold '
+  c.font = `${fontStyle}${fontSize}px ${fontFamily}`
+  c.fillStyle = color
+  c.textAlign = alignment
+  c.textBaseline = 'middle'
+
+  // Draw text
+  c.fillText(text, 0, 0)
+
+  // Draw selection box when hovered/selected
+  if (selectedIds.value.includes(element.id)) {
+    const metrics = c.measureText(text)
+    const textWidth = metrics.width
+    const textHeight = fontSize
+
+    c.strokeStyle = '#409eff'
+    c.lineWidth = 1 / zoom.value // Scale-independent stroke
+    c.setLineDash([5, 3])
+
+    let boxX = 0
+    if (alignment === 'left') boxX = 0
+    else if (alignment === 'center') boxX = -textWidth / 2
+    else if (alignment === 'right') boxX = -textWidth
+
+    c.strokeRect(boxX - 2, -textHeight / 2 - 2, textWidth + 4, textHeight + 4)
+    c.setLineDash([])
+  }
+
+  c.restore()
+}
 
 function drawNavPath(c: CanvasRenderingContext2D, element: any) {
   if (element.points.length < 2) return
@@ -789,14 +1006,31 @@ function drawSelectionHighlight(c: CanvasRenderingContext2D, element: MapElement
     }
     c.stroke()
 
-    // Draw control points
+    // Draw control points (editable)
     c.setLineDash([])
-    c.fillStyle = '#fff'
-    c.strokeStyle = '#409eff'
-    for (const point of element.points) {
+    for (let i = 0; i < element.points.length; i++) {
+      const point = element.points[i]
+      const isHovered = hoveredControlPoint.value?.elementId === element.id &&
+                        hoveredControlPoint.value?.pointIndex === i
+      const isSelected = selectedControlPoint.value?.elementId === element.id &&
+                         selectedControlPoint.value?.pointIndex === i
+
       c.beginPath()
-      c.arc(point.x, point.y, 5, 0, Math.PI * 2)
+      c.arc(point.x, point.y, isHovered || isSelected ? 7 : 5, 0, Math.PI * 2)
+
+      // Fill color based on state
+      if (isSelected) {
+        c.fillStyle = '#409eff' // Blue for selected
+      } else if (isHovered) {
+        c.fillStyle = '#67C23A' // Green for hovered
+      } else {
+        c.fillStyle = '#fff' // White for normal
+      }
       c.fill()
+
+      // Stroke
+      c.strokeStyle = isSelected || isHovered ? '#303133' : '#409eff'
+      c.lineWidth = isSelected || isHovered ? 2.5 : 2
       c.stroke()
     }
   } else if ('position' in element && element.position) {
@@ -806,6 +1040,30 @@ function drawSelectionHighlight(c: CanvasRenderingContext2D, element: MapElement
   }
 
   c.restore()
+}
+
+// Helper: Get control point at canvas position
+function getControlPointAt(canvasPos: Point): { elementId: string; pointIndex: number } | null {
+  const threshold = 10 / zoom.value // Hit test threshold in canvas units
+
+  // Only check selected elements with points
+  for (const id of selectedIds.value) {
+    const element = elementsStore.getElementById(id)
+    if (!element || !('points' in element)) continue
+
+    for (let i = 0; i < element.points.length; i++) {
+      const point = element.points[i]
+      const dx = canvasPos.x - point.x
+      const dy = canvasPos.y - point.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      if (distance <= threshold) {
+        return { elementId: id, pointIndex: i }
+      }
+    }
+  }
+
+  return null
 }
 
 function drawDrawingPreview(c: CanvasRenderingContext2D) {
@@ -986,6 +1244,15 @@ function handleMouseDown(e: MouseEvent) {
   const tool = currentTool.value
 
   if (tool === 'select') {
+    // Check if clicking on a control point first
+    const controlPoint = getControlPointAt(canvasPos)
+    if (controlPoint) {
+      selectedControlPoint.value = controlPoint
+      isDraggingControlPoint.value = true
+      controlPointDragStart.value = canvasPos
+      return
+    }
+
     // Check if clicking on an element
     const clickedElement = findElementAtPoint(canvasPos)
 
@@ -1013,8 +1280,8 @@ function handleMouseDown(e: MouseEvent) {
     // Drawing tools
     const snappedPos = getSnappedPosition(canvasPos)
 
-    // 单击创建的工具类型（POI、导航节点、门、窗户）
-    if (tool === 'poi' || tool === 'navnode' || tool === 'door' || tool === 'window') {
+    // 单击创建的工具类型（POI、导航节点、门、窗户、文本）
+    if (tool === 'poi' || tool === 'navnode' || tool === 'door' || tool === 'window' || tool === 'text') {
       if (tool === 'poi') {
         // Find nearest navigation node for POI association
         const accessNodeId = findNearestNodeForPOI(snappedPos)
@@ -1025,6 +1292,9 @@ function handleMouseDown(e: MouseEvent) {
         elementsStore.createDoor(currentFloor.value, snappedPos)
       } else if (tool === 'window') {
         elementsStore.createWindow(currentFloor.value, snappedPos)
+      } else if (tool === 'text') {
+        // Create text label and immediately prompt for content
+        showTextInputDialog(snappedPos)
       }
       // 不进入绘制模式，直接创建
       return
@@ -1054,6 +1324,19 @@ function handleMouseMove(e: MouseEvent) {
 
   // Update dimension label position
   dimensionPos.value = { x: screenPos.x + 15, y: screenPos.y - 25 }
+
+  // Handle control point dragging
+  if (isDraggingControlPoint.value && selectedControlPoint.value) {
+    const element = elementsStore.getElementById(selectedControlPoint.value.elementId)
+    if (element && 'points' in element) {
+      const newPoints = [...element.points]
+      const snappedPos = getSnappedPosition(canvasPos)
+      newPoints[selectedControlPoint.value.pointIndex] = snappedPos
+      elementsStore.updateElementPoints(selectedControlPoint.value.elementId, newPoints)
+    }
+    render()
+    return
+  }
 
   if (isPanning.value) {
     const dx = screenPos.x - lastMousePos.value.x
@@ -1098,6 +1381,13 @@ function handleMouseMove(e: MouseEvent) {
   } else {
     currentDimension.value = ''
     editorStore.setHoverPoint(null)
+
+    // Update hovered control point
+    const controlPoint = getControlPointAt(canvasPos)
+    hoveredControlPoint.value = controlPoint
+    if (controlPoint) {
+      render() // Re-render to show hover effect
+    }
   }
 
   lastMousePos.value = screenPos
@@ -1110,11 +1400,20 @@ function handleMouseUp(e: MouseEvent) {
     return
   }
 
+  // Stop control point dragging
+  if (isDraggingControlPoint.value) {
+    isDraggingControlPoint.value = false
+    controlPointDragStart.value = null
+    // Keep control point selected for deletion
+    return
+  }
+
   isDragging.value = false
   startDragPos.value = null
-  
-  // 如果正在用房间工具绘制，鼠标释放时完成绘制
-  if (isDrawing.value && currentTool.value === 'room') {
+
+  // 如果正在用房间/走廊/大厅工具拖动绘制，鼠标释放时完成绘制
+  const dragTools = ['room', 'corridor', 'hall']
+  if (isDrawing.value && dragTools.includes(currentTool.value)) {
     const points = drawingPoints.value
     if (points.length >= 2) {
       const rect = createRectangle(points[0], points[points.length - 1])
@@ -1124,7 +1423,14 @@ function handleMouseUp(e: MouseEvent) {
       // 最小尺寸为 5 个画布单位（不受缩放影响）
       const minSize = 5
       if (width > minSize && height > minSize) {
-        elementsStore.createRoom(currentFloor.value, rect)
+        // Create element based on tool type
+        if (currentTool.value === 'room') {
+          elementsStore.createRoom(currentFloor.value, rect)
+        } else if (currentTool.value === 'corridor') {
+          elementsStore.createCorridor(currentFloor.value, rect)
+        } else if (currentTool.value === 'hall') {
+          elementsStore.createHall(currentFloor.value, rect)
+        }
       }
     }
     editorStore.cancelDrawing()
@@ -1139,16 +1445,59 @@ function handleMouseLeave() {
   currentDimension.value = ''
 }
 
-function handleDoubleClick() {
-  if (!isDrawing.value) return
+// Show text input dialog for creating or editing text
+async function showTextInputDialog(position?: Point, existingTextId?: string) {
+  try {
+    const existingElement = existingTextId ? elementsStore.getElementById(existingTextId) : null
+    const defaultValue = existingElement && 'text' in existingElement ? existingElement.text : '房间标签'
 
-  finishDrawing()
+    const { value } = await ElMessageBox.prompt('请输入文本内容', '文本标签', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /.+/,
+      inputErrorMessage: '文本内容不能为空',
+      inputValue: defaultValue
+    })
+
+    if (value) {
+      if (existingTextId) {
+        // Edit existing text
+        elementsStore.updateElement(existingTextId, { text: value })
+      } else if (position) {
+        // Create new text
+        elementsStore.createText(currentFloor.value, position, value)
+      }
+    }
+  } catch (error) {
+    // User cancelled, do nothing
+  }
 }
 
-function handleContextMenu() {
+function handleDoubleClick(e: MouseEvent) {
+  // Check if double-clicking on a text element to edit it
+  if (!isDrawing.value) {
+    const rect = containerRef.value!.getBoundingClientRect()
+    const screenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    const canvasPos = editorStore.screenToCanvas(screenPos)
+    const clickedElement = findElementAtPoint(canvasPos)
+
+    if (clickedElement && clickedElement.type === 'text') {
+      showTextInputDialog(undefined, clickedElement.id)
+      return
+    }
+  }
+
+  if (!isDrawing.value) return
+
+  finishCurrentSegment()
+}
+
+function handleContextMenu(e: MouseEvent) {
+  e.preventDefault()
+
   if (isDrawing.value) {
-    editorStore.cancelDrawing()
-    currentDimension.value = ''
+    // 右键：完成当前段并开始新段（不退出工具）
+    finishCurrentSegment()
   }
 }
 
@@ -1187,24 +1536,38 @@ function handleKeyDown(e: KeyboardEvent) {
     case 'm':
       switchTool('poi')
       break
+    case 't':
+      switchTool('text')
+      break
     case 'n':
       switchTool('navpath')
       break
     case 'escape':
       if (isDrawing.value) {
+        // Escape: 取消当前绘制并退出工具
         editorStore.cancelDrawing()
         currentDimension.value = ''
+        // 退出绘制工具，切换到选择工具
+        editorStore.setTool('select')
       } else {
         editorStore.clearSelection()
       }
       break
     case 'enter':
       if (isDrawing.value) {
-        finishDrawing()
+        // Enter: 完成当前段，工具保持激活（可以继续画新段）
+        finishCurrentSegment()
       }
       break
     case 'delete':
-      if (selectedIds.value.length > 0 && !isDrawing.value) {
+      // If a control point is selected, delete it
+      if (selectedControlPoint.value) {
+        elementsStore.removePointFromElement(
+          selectedControlPoint.value.elementId,
+          selectedControlPoint.value.pointIndex
+        )
+        selectedControlPoint.value = null
+      } else if (selectedIds.value.length > 0 && !isDrawing.value) {
         elementsStore.deleteElements(selectedIds.value)
         editorStore.clearSelection()
       }
@@ -1217,17 +1580,39 @@ function handleKeyDown(e: KeyboardEvent) {
           editorStore.cancelDrawing()
           currentDimension.value = ''
         }
+      } else if (selectedIds.value.length === 1) {
+        // If a single element with points is selected, delete its last point
+        const element = elementsStore.getElementById(selectedIds.value[0])
+        if (element && 'points' in element && element.points.length > 0) {
+          elementsStore.removePointFromElement(element.id, element.points.length - 1)
+        } else {
+          // Otherwise delete the element
+          elementsStore.deleteElements(selectedIds.value)
+          editorStore.clearSelection()
+        }
       } else if (selectedIds.value.length > 0) {
+        // Multiple elements selected, delete all
         elementsStore.deleteElements(selectedIds.value)
         editorStore.clearSelection()
       }
       break
     case 'z':
       if (e.ctrlKey || e.metaKey) {
-        if (e.shiftKey) {
-          elementsStore.redo()
+        // 如果正在绘制，Ctrl+Z 删除最后一个点（而不是全局撤销）
+        if (isDrawing.value) {
+          e.preventDefault() // 防止浏览器默认行为
+          if (!editorStore.removeLastDrawingPoint()) {
+            // 如果只剩一个点，取消绘制
+            editorStore.cancelDrawing()
+            currentDimension.value = ''
+          }
         } else {
-          elementsStore.undo()
+          // 没有在绘制时，执行全局撤销/重做
+          if (e.shiftKey) {
+            elementsStore.redo()
+          } else {
+            elementsStore.undo()
+          }
         }
       }
       break
@@ -1242,55 +1627,67 @@ function handleKeyUp(e: KeyboardEvent) {
   }
 }
 
-function finishDrawing() {
-  const points = editorStore.finishDrawing()
+// 完成当前段，但保持工具激活（可以继续画新段）
+function finishCurrentSegment() {
+  const points = [...drawingPoints.value]
+
+  // 清空当前绘制状态（但不退出工具）
+  editorStore.cancelDrawing()
+  currentDimension.value = ''
+
   if (points.length < 2) return
 
   const tool = currentTool.value
   const floor = currentFloor.value
 
+  // Skip if this was a drag tool (already handled in handleMouseUp)
+  const dragTools = ['room', 'corridor', 'hall']
+  if (dragTools.includes(tool) && points.length === 2) {
+    return
+  }
+
+  // 创建元素
   switch (tool) {
     case 'wall':
       elementsStore.createWall(floor, points)
       break
-    case 'room':
-      if (points.length >= 2) {
-        const rect = createRectangle(points[0], points[points.length - 1])
-        elementsStore.createRoom(floor, rect)
-      }
-      break
-    case 'polygon':
-      if (points.length >= 3) {
-        elementsStore.createRoom(floor, [...points, points[0]])
-      }
-      break
     case 'navpath': {
-      // Snap endpoints to nearby navigation nodes
       const { snappedPoints, startNodeId, endNodeId } = snapPathToNodes(points)
       const distance = calculatePathDistance(snappedPoints)
       elementsStore.createNavPath(floor, snappedPoints, true, startNodeId, endNodeId, distance)
       break
     }
-    case 'navnode':
-      if (points.length >= 1) {
-        elementsStore.createNavNode(floor, points[0])
+    case 'polygon':
+      if (points.length >= 3) {
+        elementsStore.createRoom(floor, [...points, points[0]])
       }
       break
-    case 'poi':
-      if (points.length >= 1) {
-        elementsStore.createPOI(floor, points[0])
+    case 'room':
+      if (points.length >= 3) {
+        elementsStore.createRoom(floor, [...points, points[0]])
+      }
+      break
+    case 'corridor':
+      if (points.length >= 3) {
+        elementsStore.createCorridor(floor, [...points, points[0]])
+      }
+      break
+    case 'hall':
+      if (points.length >= 3) {
+        elementsStore.createHall(floor, [...points, points[0]])
       }
       break
   }
 
-  currentDimension.value = ''
+  // 工具保持激活，用户可以继续画下一段
 }
 
 function findElementAtPoint(point: Point): MapElement | undefined {
   // Search in reverse order (top elements first)
+  // Skip locked elements
   const elements = [...currentElements.value].reverse()
   for (const element of elements) {
-    if (elementContainsPoint(element, point, 10)) {
+    if (!element.locked && elementContainsPoint(element, point, 10)) {
       return element
     }
   }
@@ -1393,7 +1790,6 @@ function calculatePathDistance(points: Point[]): number {
 .canvas-wrapper {
   flex: 1;
   overflow: hidden;
-  cursor: crosshair;
   position: relative;
 }
 
