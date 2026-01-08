@@ -2,8 +2,6 @@
 
 一个基于 Web 的室内地图设计器，用于创建楼层平面图并导出 GeoJSON 格式，支持室内导航和定位应用。
 
-## 关注我获得更多室内定位技术
-![程序员石磊](https://github.com/zhangleino1/Indoor-Map-Designer/blob/main/%E6%89%AB%E7%A0%81_%E6%90%9C%E7%B4%A2%E8%81%94%E5%90%88%E4%BC%A0%E6%92%AD%E6%A0%B7%E5%BC%8F-%E6%A0%87%E5%87%86%E8%89%B2%E7%89%88.png)
 
 ## ✨ 核心特性
 
@@ -102,6 +100,10 @@ npm run dev:server  # Backend on http://localhost:3001
 ```bash
 npm run build
 ```
+
+## 关注我获得更多室内定位技术
+![程序员石磊](https://github.com/zhangleino1/Indoor-Map-Designer/blob/main/%E6%89%AB%E7%A0%81_%E6%90%9C%E7%B4%A2%E8%81%94%E5%90%88%E4%BC%A0%E6%92%AD%E6%A0%B7%E5%BC%8F-%E6%A0%87%E5%87%86%E8%89%B2%E7%89%88.png)
+
 
 ## Usage
 
